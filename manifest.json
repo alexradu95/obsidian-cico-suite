@@ -1,0 +1,10 @@
+{
+	"id": "daily-ai-assistant",
+	"name": "Daily AI Assistant",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "An AI-powered assistant that proactively engages you with thoughtful questions when opening your daily notes, helping you reflect on your day.",
+	"author": "Your Name",
+	"authorUrl": "https://github.com/yourusername",
+	"isDesktopOnly": false
+}

@@ -1,5 +1,10 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, requestUrl, Notice, WorkspaceLeaf, ItemView, MarkdownView } from 'obsidian';
 import interact from '@interactjs/interactjs';
+import { StrictMode } from 'react';
+import { Root, createRoot } from 'react-dom/client';
+import { AppContext } from './src/context/AppContext';
+import { SidebarView } from './src/components/SidebarView';
+import { PopoverView } from './src/components/PopoverView';
 
 interface Message {
 	role: 'system' | 'user' | 'assistant';
@@ -222,14 +227,8 @@ export default class DailyAIAssistantPlugin extends Plugin {
 	}
 
 	updateAllContextInfo() {
-		// Update sidebar view if it exists
-		if (this.sidebarView && this.sidebarView.base) {
-			this.sidebarView.base.updateContextInfo();
-		}
-		// Update floating popover if it exists and is visible
-		if (this.floatingPopover && this.floatingPopover.isVisible()) {
-			this.floatingPopover.updateContextInfo();
-		}
+		// Context info is now managed by React components
+		// React components will update themselves through their useEffect hooks
 	}
 
 	isDailyNote(file: TFile): boolean {
@@ -301,151 +300,16 @@ export default class DailyAIAssistantPlugin extends Plugin {
 	}
 }
 
-// Base class for shared functionality
-class AIAssistantBase {
-	plugin: DailyAIAssistantPlugin;
-	chatHistory: Message[] = [];
-	conversationEl: HTMLElement;
-	inputEl: HTMLTextAreaElement;
-	sendButton: HTMLButtonElement;
-	analyzeButton: HTMLButtonElement;
-	clearButton: HTMLButtonElement;
-	loadingEl: HTMLElement;
-	contextInfoEl: HTMLElement;
-	isLoading = false;
-
-	constructor(plugin: DailyAIAssistantPlugin) {
-		this.plugin = plugin;
-	}
-
-	setLoading(loading: boolean) {
-		this.isLoading = loading;
-		this.inputEl.disabled = loading;
-		this.sendButton.disabled = loading;
-		this.analyzeButton.disabled = loading;
-
-		if (loading) {
-			this.loadingEl?.removeClass('hidden');
-		} else {
-			this.loadingEl?.addClass('hidden');
-		}
-	}
-
-	updateContextInfo() {
-		const activeFile = this.plugin.app.workspace.getActiveFile();
-		if (activeFile && this.contextInfoEl) {
-			const openTabs = this.plugin.app.workspace.getLeavesOfType('markdown').length;
-			this.contextInfoEl.setText(`📄 ${activeFile.basename} | 📑 ${openTabs} tabs deschise`);
-		}
-	}
-
-	clearConversation() {
-		this.chatHistory = [];
-		this.conversationEl.empty();
-		new Notice('Conversație ștearsă');
-	}
-
-	async analyzeCurrentDocument(containerEl: HTMLElement) {
-		const activeFile = this.plugin.app.workspace.getActiveFile();
-		if (!activeFile) {
-			new Notice('No active file');
-			return;
-		}
-
-		const content = await this.plugin.app.vault.read(activeFile);
-		if (content.trim().length < 50) {
-			this.addMessage('system', 'Document prea scurt. Scrie mai întâi ceva!', containerEl);
-			return;
-		}
-
-		this.setLoading(true);
-		this.updateContextInfo();
-
-		const previousContext = await this.plugin.getPreviousDailyNotes();
-		const tabsContext = await this.plugin.getOpenTabsContext();
-		const personalityPrompt = PERSONALITY_PROMPTS[this.plugin.settings.personality];
-
-		const analysisPrompt: Message = {
-			role: 'system',
-			content: `${personalityPrompt}
-
-Analizează documentul curent și oferă observații sau întrebări pentru reflecție.
-
-Document curent: ${activeFile.basename}
-Conținut: ${content.substring(0, 1000)}
-
-Context zile anterioare:
-${previousContext}${tabsContext}`
-		};
-
-		this.chatHistory = [analysisPrompt];
-
-		try {
-			const insight = await this.plugin.callLMStudio([analysisPrompt]);
-			this.addMessage('assistant', insight, containerEl);
-			this.chatHistory.push({ role: 'assistant', content: insight });
-		} catch (error) {
-			new Notice('Eroare: ' + error.message);
-			this.addMessage('system', 'Eroare: ' + error.message, containerEl);
-		} finally {
-			this.setLoading(false);
-		}
-	}
-
-	async sendMessage(containerEl: HTMLElement) {
-		const message = this.inputEl.value.trim();
-		if (!message) return;
-
-		this.setLoading(true);
-		this.updateContextInfo();
-
-		this.chatHistory.push({ role: 'user', content: message });
-		this.addMessage('user', message, containerEl);
-		this.inputEl.value = '';
-
-		const thinkingEl = this.conversationEl.createDiv('ai-message ai-message-thinking');
-		thinkingEl.setText('🤔 Mă gândesc...');
-
-		try {
-			const response = await this.plugin.callLMStudio(this.chatHistory);
-			thinkingEl.remove();
-
-			this.chatHistory.push({ role: 'assistant', content: response });
-			this.addMessage('assistant', response, containerEl);
-		} catch (error) {
-			thinkingEl.remove();
-			this.addMessage('system', 'Eroare: ' + error.message, containerEl);
-		} finally {
-			this.setLoading(false);
-			this.inputEl.focus();
-		}
-	}
-
-	addMessage(role: string, content: string, containerEl: HTMLElement) {
-		const messageEl = containerEl.createDiv(`ai-message ai-message-${role}`);
-
-		const icon = messageEl.createSpan('ai-message-icon');
-		if (role === 'assistant') icon.setText('🤖');
-		else if (role === 'user') icon.setText('👤');
-		else icon.setText('ℹ️');
-
-		const contentSpan = messageEl.createSpan('ai-message-content');
-		contentSpan.setText(content);
-
-		containerEl.scrollTop = containerEl.scrollHeight;
-	}
-}
+// AIAssistantBase is now replaced by React components in src/components/AIAssistantView.tsx
 
 // Sidebar View
 class AIAssistantSidebarView extends ItemView {
 	plugin: DailyAIAssistantPlugin;
-	base: AIAssistantBase;
-	containerEl: HTMLElement;
+	root: Root | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: DailyAIAssistantPlugin) {
 		super(leaf);
 		this.plugin = plugin;
-		this.base = new AIAssistantBase(plugin);
 	}
 
 	getViewType(): string {
@@ -461,149 +325,68 @@ class AIAssistantSidebarView extends ItemView {
 	}
 
 	async onOpen() {
-		this.containerEl = this.contentEl;
-		this.containerEl.empty();
-		this.containerEl.addClass('ai-assistant-sidebar');
-
-		this.buildUI();
-	}
-
-	buildUI() {
-		// Header
-		const header = this.containerEl.createDiv('ai-assistant-header');
-		const title = header.createDiv('ai-assistant-title');
-		title.createSpan({ text: '🤖 AI Assistant' });
-
-		const controls = header.createDiv('ai-assistant-controls');
-
-		// Clear button
-		this.base.clearButton = controls.createEl('button', { text: '🗑️', attr: { 'aria-label': 'Clear conversation' } });
-		this.base.clearButton.onclick = () => this.base.clearConversation();
-
-		// Pin/Unpin button
-		const unpinBtn = controls.createEl('button', { text: '📌', attr: { 'aria-label': 'Unpin to floating' } });
-		unpinBtn.onclick = () => this.plugin.switchToFloating();
-
-		// Body
-		const body = this.containerEl.createDiv('ai-assistant-body');
-
-		// Context info
-		this.base.contextInfoEl = body.createDiv('ai-context-info');
-		this.base.updateContextInfo();
-
-		// Conversation area
-		this.base.conversationEl = body.createDiv('ai-conversation-area');
-
-		// Loading indicator
-		this.base.loadingEl = body.createDiv('ai-loading hidden');
-		this.base.loadingEl.setText('⏳ Se încarcă...');
-
-		// Input area
-		const inputContainer = body.createDiv('ai-input-container');
-		this.base.inputEl = inputContainer.createEl('textarea', {
-			placeholder: 'Întreabă-mă ceva...',
-			attr: { rows: '2' }
-		});
-
-		this.base.inputEl.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
-				e.preventDefault();
-				this.base.sendMessage(this.base.conversationEl);
-			}
-		});
-
-		const buttonContainer = inputContainer.createDiv('ai-button-container');
-		this.base.sendButton = buttonContainer.createEl('button', { text: 'Trimite', cls: 'ai-btn-send' });
-		this.base.sendButton.onclick = () => this.base.sendMessage(this.base.conversationEl);
-
-		this.base.analyzeButton = buttonContainer.createEl('button', { text: 'Analizează', cls: 'ai-btn-analyze' });
-		this.base.analyzeButton.onclick = () => this.base.analyzeCurrentDocument(this.base.conversationEl);
+		this.root = createRoot(this.contentEl);
+		this.root.render(
+			<StrictMode>
+				<AppContext.Provider value={{ app: this.app, plugin: this.plugin }}>
+					<SidebarView onUnpin={() => this.plugin.switchToFloating()} />
+				</AppContext.Provider>
+			</StrictMode>
+		);
 	}
 
 	async onClose() {
-		// Cleanup if needed
+		this.root?.unmount();
 	}
 }
 
 // Floating Popover
-class AIAssistantPopover extends AIAssistantBase {
+class AIAssistantPopover {
+	plugin: DailyAIAssistantPlugin;
 	containerEl: HTMLElement;
+	root: Root | null = null;
 	visible = false;
 
 	constructor(plugin: DailyAIAssistantPlugin) {
-		super(plugin);
+		this.plugin = plugin;
 		this.createPopover();
 		this.makeDraggable();
 		this.makeResizable();
 	}
 
 	createPopover() {
-		this.containerEl = document.body.createDiv('ai-assistant-popover');
+		this.containerEl = document.body.createDiv('ai-assistant-popover-wrapper');
 
-		// Header
-		const header = this.containerEl.createDiv('ai-assistant-header');
-		const title = header.createDiv('ai-assistant-title');
-		title.createSpan({ text: '🤖 AI Assistant' });
-
-		const controls = header.createDiv('ai-assistant-controls');
-
-		// Clear button
-		this.clearButton = controls.createEl('button', { text: '🗑️', attr: { 'aria-label': 'Clear conversation' } });
-		this.clearButton.onclick = () => this.clearConversation();
-
-		// Pin button
-		const pinBtn = controls.createEl('button', { text: '📌', attr: { 'aria-label': 'Pin to sidebar' } });
-		pinBtn.onclick = () => this.plugin.switchToSidebar();
-
-		const minimizeBtn = controls.createEl('button', { text: '−' });
-		minimizeBtn.onclick = () => this.toggleMinimize();
-
-		const closeBtn = controls.createEl('button', { text: '×' });
-		closeBtn.onclick = () => this.hide();
-
-		// Body
-		const body = this.containerEl.createDiv('ai-assistant-body');
-
-		// Context info
-		this.contextInfoEl = body.createDiv('ai-context-info');
-		this.updateContextInfo();
-
-		// Conversation area
-		this.conversationEl = body.createDiv('ai-conversation-area');
-
-		// Loading indicator
-		this.loadingEl = body.createDiv('ai-loading hidden');
-		this.loadingEl.setText('⏳ Se încarcă...');
-
-		// Input area
-		const inputContainer = body.createDiv('ai-input-container');
-		this.inputEl = inputContainer.createEl('textarea', {
-			placeholder: 'Întreabă-mă ceva...',
-			attr: { rows: '2' }
-		});
-
-		this.inputEl.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
-				e.preventDefault();
-				this.sendMessage(this.conversationEl);
-			}
-		});
-
-		const buttonContainer = inputContainer.createDiv('ai-button-container');
-		this.sendButton = buttonContainer.createEl('button', { text: 'Trimite', cls: 'ai-btn-send' });
-		this.sendButton.onclick = () => this.sendMessage(this.conversationEl);
-
-		this.analyzeButton = buttonContainer.createEl('button', { text: 'Analizează', cls: 'ai-btn-analyze' });
-		this.analyzeButton.onclick = () => this.analyzeCurrentDocument(this.conversationEl);
-
-		// Resize handles
-		this.createResizeHandles();
-
-		// Initial position
+		// Initial position and size
 		this.containerEl.style.left = '50px';
 		this.containerEl.style.top = '100px';
 		this.containerEl.style.width = '400px';
 		this.containerEl.style.height = '500px';
+		this.containerEl.style.position = 'fixed';
+		this.containerEl.style.zIndex = '1000';
+
+		// Create resize handles
+		this.createResizeHandles();
+
+		// Mount React component
+		this.root = createRoot(this.containerEl);
+		this.renderReact();
+	}
+
+	renderReact() {
+		if (this.root) {
+			this.root.render(
+				<StrictMode>
+					<AppContext.Provider value={{ app: this.plugin.app, plugin: this.plugin }}>
+						<PopoverView
+							onClose={() => this.hide()}
+							onPin={() => this.plugin.switchToSidebar()}
+							onMinimize={() => this.toggleMinimize()}
+						/>
+					</AppContext.Provider>
+				</StrictMode>
+			);
+		}
 	}
 
 	createResizeHandles() {
@@ -625,9 +408,9 @@ class AIAssistantPopover extends AIAssistantBase {
 				],
 				listeners: {
 					move: (event) => {
-						const target = event.target;
-						const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
-						const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+						const target = event.target as HTMLElement;
+						const x = (parseFloat(target.getAttribute('data-x') || '0')) + event.dx;
+						const y = (parseFloat(target.getAttribute('data-y') || '0')) + event.dy;
 
 						target.style.transform = `translate(${x}px, ${y}px)`;
 						target.setAttribute('data-x', x.toString());
@@ -648,9 +431,9 @@ class AIAssistantPopover extends AIAssistantBase {
 				],
 				listeners: {
 					move: (event) => {
-						const target = event.target;
-						let x = parseFloat(target.getAttribute('data-x')) || 0;
-						let y = parseFloat(target.getAttribute('data-y')) || 0;
+						const target = event.target as HTMLElement;
+						let x = parseFloat(target.getAttribute('data-x') || '0');
+						let y = parseFloat(target.getAttribute('data-y') || '0');
 
 						target.style.width = `${event.rect.width}px`;
 						target.style.height = `${event.rect.height}px`;
@@ -685,6 +468,7 @@ class AIAssistantPopover extends AIAssistantBase {
 	}
 
 	destroy() {
+		this.root?.unmount();
 		this.containerEl.remove();
 	}
 }

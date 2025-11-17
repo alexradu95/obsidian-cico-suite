@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 import { App } from 'obsidian';
-import DailyAIAssistantPlugin from '../../main';
+import type DailyAIAssistantPlugin from '../main';
 
 export interface AppContextType {
 	app: App;

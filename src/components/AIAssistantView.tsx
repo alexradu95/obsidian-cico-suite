@@ -1,11 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Notice } from 'obsidian';
 import { useApp } from '../hooks/useApp';
-
-interface Message {
-	role: 'system' | 'user' | 'assistant';
-	content: string;
-}
+import { PERSONALITY_PROMPTS, type Message } from '../types';
 
 interface AIAssistantViewProps {
 	onClear?: () => void;
@@ -19,33 +15,35 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 	const [contextInfo, setContextInfo] = useState('');
 	const conversationRef = useRef<HTMLDivElement>(null);
 
-	useEffect(() => {
-		updateContextInfo();
-	}, []);
+	const aiService = useMemo(() => plugin.aiService, [plugin]);
 
-	const updateContextInfo = () => {
+	const updateContextInfo = useCallback(() => {
 		const activeFile = app.workspace.getActiveFile();
 		if (activeFile) {
 			const openTabs = app.workspace.getLeavesOfType('markdown').length;
 			setContextInfo(`📄 ${activeFile.basename} | 📑 ${openTabs} tabs deschise`);
 		}
-	};
+	}, [app]);
 
-	const clearConversation = () => {
+	useEffect(() => {
+		updateContextInfo();
+	}, [updateContextInfo]);
+
+	const clearConversation = useCallback(() => {
 		setChatHistory([]);
 		new Notice('Conversație ștearsă');
 		onClear?.();
-	};
+	}, [onClear]);
 
-	const addMessage = (role: string, content: string) => {
+	const addMessage = useCallback((role: string, content: string) => {
 		const newMessage: Message = {
 			role: role as 'system' | 'user' | 'assistant',
 			content
 		};
 		setChatHistory(prev => [...prev, newMessage]);
-	};
+	}, []);
 
-	const analyzeCurrentDocument = async () => {
+	const analyzeCurrentDocument = useCallback(async () => {
 		const activeFile = app.workspace.getActiveFile();
 		if (!activeFile) {
 			new Notice('No active file');
@@ -61,29 +59,9 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 		setIsLoading(true);
 		updateContextInfo();
 
-		const previousContext = await plugin.getPreviousDailyNotes();
-		const tabsContext = await plugin.getOpenTabsContext();
-		const personalityPrompts: Record<string, string> = {
-			concise: `Ești un asistent de jurnal direct și concis. Vorbește în limba română.
-Răspunde scurt (1-2 propoziții). Pune o întrebare clară sau fă o observație specifică.
-Fără limbaj poetic. Concentrează-te pe: sport/sală, dezvoltare personală, relaxare, obiceiuri zilnice.`,
-			balanced: `Ești un asistent de jurnal prietenos și gânditor. Vorbește în limba română.
-Oferă observații sau întrebări concise (2-3 propoziții). Fii cald dar nu prea verbos.
-Concentrează-te pe: sport/sală (ce ai făcut, cum te-ai simțit), dezvoltare personală (ce ai învățat/lucrat azi),
-relaxare (cum te destresezi), și pattern-uri între ziua curentă și zilele anterioare.`,
-			reflective: `Ești un asistent de jurnal gânditor, ca un psiholog AI. Vorbește în limba română.
-Oferă insight-uri profunde și întrebări semnificative pentru reflecție (3-4 propoziții).
-Analizează: exercițiu fizic (ai fost la sală? ce ai făcut? cum te-ai simțit?),
-dezvoltare personală (ai învățat ceva nou? ai lucrat la proiecte personale?),
-relaxare și auto-îngrijire (cum te-ai destins? ce te-a ajutat?).
-Compară cu zilele anterioare pentru a identifica pattern-uri și progress.`,
-			poetic: `Ești un asistent de jurnal creativ și expresiv. Vorbește în limba română.
-Folosește limbaj viu și metafore pentru a ajuta utilizatorul să reflecteze.
-Explorează: exercițiul fizic (sala, mișcarea, cum simte corpul),
-dezvoltarea sa (învățare, creștere, proiecte), relaxarea (cum își reîncarcă bateriile).
-Fii cald, încurajator, și ajută-l să vadă conexiuni mai profunde între experiențele zilnice.`
-		};
-		const personalityPrompt = personalityPrompts[plugin.settings.personality];
+		const previousContext = await aiService.getPreviousDailyNotes();
+		const tabsContext = await aiService.getOpenTabsContext();
+		const personalityPrompt = PERSONALITY_PROMPTS[plugin.settings.personality];
 
 		const analysisPrompt: Message = {
 			role: 'system',
@@ -102,7 +80,7 @@ ${previousContext}${tabsContext}`
 		setChatHistory(newHistory);
 
 		try {
-			const insight = await plugin.callLMStudio([analysisPrompt]);
+			const insight = await aiService.callLMStudio([analysisPrompt]);
 			addMessage('assistant', insight);
 		} catch (error: any) {
 			new Notice('Eroare: ' + error.message);
@@ -110,9 +88,9 @@ ${previousContext}${tabsContext}`
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [app, aiService, plugin.settings.personality, updateContextInfo, addMessage]);
 
-	const sendMessage = async () => {
+	const sendMessage = useCallback(async () => {
 		const message = inputValue.trim();
 		if (!message) return;
 
@@ -129,7 +107,7 @@ ${previousContext}${tabsContext}`
 		setChatHistory([...newHistory, thinkingMessage]);
 
 		try {
-			const response = await plugin.callLMStudio(newHistory);
+			const response = await aiService.callLMStudio(newHistory);
 			// Remove thinking message and add response
 			setChatHistory(prev => {
 				const withoutThinking = prev.filter(m => m.content !== '🤔 Mă gândesc...');
@@ -144,7 +122,7 @@ ${previousContext}${tabsContext}`
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [inputValue, chatHistory, aiService, updateContextInfo]);
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === 'Enter' && !e.shiftKey) {

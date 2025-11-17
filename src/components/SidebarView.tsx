@@ -1,5 +1,4 @@
 import { AIAssistantView } from './AIAssistantView';
-import { useApp } from '../hooks/useApp';
 
 interface SidebarViewProps {
 	onUnpin: () => void;

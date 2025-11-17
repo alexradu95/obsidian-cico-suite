@@ -1,4 +1,5 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, ItemView, requestUrl } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, requestUrl, Notice, WorkspaceLeaf, ItemView, MarkdownView } from 'obsidian';
+import interact from '@interactjs/interactjs';
 
 interface Message {
 	role: 'system' | 'user' | 'assistant';
@@ -6,6 +7,7 @@ interface Message {
 }
 
 type PersonalityPreset = 'concise' | 'balanced' | 'reflective' | 'poetic';
+type DisplayMode = 'floating' | 'sidebar';
 
 interface DailyAIAssistantSettings {
 	lmStudioUrl: string;
@@ -16,6 +18,8 @@ interface DailyAIAssistantSettings {
 	temperature: number;
 	autoAnalyze: boolean;
 	personality: PersonalityPreset;
+	defaultMode: DisplayMode;
+	includeOpenTabs: boolean;
 }
 
 const DEFAULT_SETTINGS: DailyAIAssistantSettings = {
@@ -26,10 +30,12 @@ const DEFAULT_SETTINGS: DailyAIAssistantSettings = {
 	maxTokens: 150,
 	temperature: 0.7,
 	autoAnalyze: false,
-	personality: 'concise'
+	personality: 'concise',
+	defaultMode: 'floating',
+	includeOpenTabs: true
 }
 
-const VIEW_TYPE_AI_ASSISTANT = 'ai-assistant-view';
+const VIEW_TYPE_AI_ASSISTANT = 'ai-assistant-sidebar';
 
 const PERSONALITY_PROMPTS: Record<PersonalityPreset, string> = {
 	concise: `Ești un asistent de jurnal direct și concis. Vorbește în limba română.
@@ -57,23 +63,26 @@ Fii cald, încurajator, și ajută-l să vadă conexiuni mai profunde între exp
 
 export default class DailyAIAssistantPlugin extends Plugin {
 	settings: DailyAIAssistantSettings;
-	assistantView: AIAssistantView | null = null;
+	floatingPopover: AIAssistantPopover | null = null;
+	sidebarView: AIAssistantSidebarView | null = null;
+	currentMode: DisplayMode = 'floating';
 
 	async onload() {
 		await this.loadSettings();
+		this.currentMode = this.settings.defaultMode;
 
-		// Register the view
+		// Register sidebar view
 		this.registerView(
 			VIEW_TYPE_AI_ASSISTANT,
-			(leaf) => (this.assistantView = new AIAssistantView(leaf, this))
+			(leaf) => (this.sidebarView = new AIAssistantSidebarView(leaf, this))
 		);
 
-		// Add ribbon icon to toggle assistant
+		// Add ribbon icon
 		this.addRibbonIcon('message-circle', 'Toggle AI Assistant', () => {
 			this.toggleAssistant();
 		});
 
-		// Add command to toggle assistant
+		// Add command
 		this.addCommand({
 			id: 'toggle-ai-assistant',
 			name: 'Toggle AI Assistant',
@@ -82,38 +91,201 @@ export default class DailyAIAssistantPlugin extends Plugin {
 			}
 		});
 
-		// Listen for active leaf changes to analyze current document
-		this.registerEvent(
-			this.app.workspace.on('active-leaf-change', () => {
-				if (this.settings.autoAnalyze && this.assistantView && this.assistantView.isVisible) {
-					this.assistantView.analyzeCurrentDocument();
-				}
-			})
-		);
+		// Add command to switch modes
+		this.addCommand({
+			id: 'toggle-assistant-mode',
+			name: 'Toggle Between Floating/Sidebar Mode',
+			callback: () => {
+				this.switchMode();
+			}
+		});
 
-		// Auto-show on daily notes if enabled
+		// Auto-show on daily notes
 		this.registerEvent(
 			this.app.workspace.on('file-open', (file) => {
-				if (this.settings.autoShowOnDailyNote && file) {
-					this.checkAndShowForDailyNote(file);
+				if (this.settings.autoShowOnDailyNote && file && this.isDailyNote(file)) {
+					// Only auto-show if not already visible
+					if (!this.isAssistantVisible()) {
+						this.showAssistant();
+					}
 				}
+				// Update context info when file changes
+				this.updateAllContextInfo();
 			})
 		);
 
-		// Initialize assistant when layout is ready
-		this.app.workspace.onLayoutReady(() => {
-			this.initAssistant();
-		});
+		// Update context when active leaf changes
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				this.updateAllContextInfo();
+			})
+		);
 
 		// Add settings tab
 		this.addSettingTab(new DailyAIAssistantSettingTab(this.app, this));
 	}
 
-	onunload() {
-		// Cleanup
-		if (this.assistantView) {
-			this.assistantView.destroy();
+	async switchMode() {
+		if (this.currentMode === 'floating') {
+			await this.switchToSidebar();
+		} else {
+			await this.switchToFloating();
 		}
+	}
+
+	async switchToSidebar() {
+		// Hide floating if open
+		if (this.floatingPopover) {
+			this.floatingPopover.hide();
+		}
+
+		// Activate sidebar
+		const { workspace } = this.app;
+		let leaf = workspace.getLeavesOfType(VIEW_TYPE_AI_ASSISTANT)[0];
+
+		if (!leaf) {
+			const rightLeaf = workspace.getRightLeaf(false);
+			if (rightLeaf) {
+				await rightLeaf.setViewState({ type: VIEW_TYPE_AI_ASSISTANT, active: true });
+				leaf = rightLeaf;
+			}
+		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+
+		this.currentMode = 'sidebar';
+		new Notice('Assistant pinned to sidebar');
+	}
+
+	async switchToFloating() {
+		// Hide sidebar if open
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_ASSISTANT);
+		leaves.forEach(leaf => leaf.detach());
+
+		// Show floating
+		if (!this.floatingPopover) {
+			this.floatingPopover = new AIAssistantPopover(this);
+		}
+		this.floatingPopover.show();
+
+		this.currentMode = 'floating';
+		new Notice('Assistant unpinned (floating mode)');
+	}
+
+	toggleAssistant() {
+		if (this.currentMode === 'floating') {
+			if (this.floatingPopover && this.floatingPopover.isVisible()) {
+				this.floatingPopover.hide();
+			} else {
+				this.showAssistant();
+			}
+		} else {
+			const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_ASSISTANT);
+			if (leaves.length > 0) {
+				leaves.forEach(leaf => leaf.detach());
+			} else {
+				this.showAssistant();
+			}
+		}
+	}
+
+	isAssistantVisible(): boolean {
+		// Check if sidebar view is open
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_ASSISTANT);
+		if (leaves.length > 0) {
+			return true;
+		}
+
+		// Check if floating popover is visible
+		if (this.floatingPopover && this.floatingPopover.isVisible()) {
+			return true;
+		}
+
+		return false;
+	}
+
+	showAssistant() {
+		if (this.currentMode === 'floating') {
+			if (!this.floatingPopover) {
+				this.floatingPopover = new AIAssistantPopover(this);
+			}
+			this.floatingPopover.show();
+		} else {
+			// Check if sidebar is already open
+			const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_ASSISTANT);
+			if (leaves.length === 0) {
+				this.switchToSidebar();
+			}
+		}
+	}
+
+	updateAllContextInfo() {
+		// Update sidebar view if it exists
+		if (this.sidebarView && this.sidebarView.base) {
+			this.sidebarView.base.updateContextInfo();
+		}
+		// Update floating popover if it exists and is visible
+		if (this.floatingPopover && this.floatingPopover.isVisible()) {
+			this.floatingPopover.updateContextInfo();
+		}
+	}
+
+	isDailyNote(file: TFile): boolean {
+		const dailyNoteRegex = /^\d{4}-\d{2}-\d{2}$/;
+		return dailyNoteRegex.test(file.basename);
+	}
+
+	async getOpenTabsContext(): Promise<string> {
+		if (!this.settings.includeOpenTabs) return '';
+
+		const leaves = this.app.workspace.getLeavesOfType('markdown');
+		const contexts: string[] = [];
+
+		for (const leaf of leaves.slice(0, 5)) { // Limit to 5 tabs
+			const view = leaf.view as MarkdownView;
+			if (view.file) {
+				const content = await this.app.vault.read(view.file);
+				contexts.push(`📄 ${view.file.basename}:\n${content.substring(0, 200)}`);
+			}
+		}
+
+		return contexts.length > 0 ? '\n\nTab-uri deschise:\n' + contexts.join('\n\n') : '';
+	}
+
+	async getPreviousDailyNotes(): Promise<string> {
+		const files = this.app.vault.getMarkdownFiles();
+		const dailyNotes = files
+			.filter(f => this.isDailyNote(f))
+			.sort((a, b) => b.basename.localeCompare(a.basename))
+			.slice(0, this.settings.daysOfContext);
+
+		const summaries: string[] = [];
+		for (const note of dailyNotes) {
+			const content = await this.app.vault.read(note);
+			const preview = content.substring(0, 300);
+			summaries.push(`📅 ${note.basename}: ${preview}`);
+		}
+
+		return summaries.join('\n\n');
+	}
+
+	async callLMStudio(messages: Message[]): Promise<string> {
+		const response = await requestUrl({
+			url: `${this.settings.lmStudioUrl}/chat/completions`,
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				model: this.settings.modelName || 'local-model',
+				messages: messages,
+				temperature: this.settings.temperature,
+				max_tokens: this.settings.maxTokens,
+				stream: false
+			})
+		});
+
+		return response.json.choices[0]?.message?.content || '';
 	}
 
 	async loadSettings() {
@@ -124,151 +296,156 @@ export default class DailyAIAssistantPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	async checkLMStudioConnection(): Promise<boolean> {
-		try {
-			const response = await requestUrl({
-				url: `${this.settings.lmStudioUrl}/models`,
-				method: 'GET',
-			});
-			return response.status === 200;
-		} catch (error) {
-			return false;
-		}
-	}
-
-	async getAvailableModels(): Promise<string[]> {
-		try {
-			const response = await requestUrl({
-				url: `${this.settings.lmStudioUrl}/models`,
-				method: 'GET',
-			});
-			if (response.status === 200 && response.json.data) {
-				return response.json.data.map((model: {id: string}) => model.id);
-			}
-			return [];
-		} catch (error) {
-			console.error('Failed to get models:', error);
-			return [];
-		}
-	}
-
-	private checkAndShowForDailyNote(file: TFile) {
-		const dailyNotePattern = /^\d{4}-\d{2}-\d{2}$/;
-		if (dailyNotePattern.test(file.basename)) {
-			setTimeout(() => {
-				if (!this.assistantView?.isVisible) {
-					this.showAssistant();
-				}
-			}, 500);
-		}
-	}
-
-	async initAssistant() {
-		// Create the assistant view in the workspace
-		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_ASSISTANT);
-		if (leaves.length === 0) {
-			// Don't show by default, just register it
-			// User can toggle it with ribbon icon or command
-		}
-	}
-
-	async showAssistant() {
-		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_ASSISTANT);
-		if (leaves.length === 0) {
-			// Create new leaf in the root
-			const leaf = this.app.workspace.getLeaf('split');
-			await leaf.setViewState({
-				type: VIEW_TYPE_AI_ASSISTANT,
-				active: true,
-			});
-		}
-		if (this.assistantView) {
-			this.assistantView.show();
-		}
-	}
-
-	async hideAssistant() {
-		if (this.assistantView) {
-			this.assistantView.hide();
-		}
-	}
-
-	async toggleAssistant() {
-		if (this.assistantView?.isVisible) {
-			this.hideAssistant();
-		} else {
-			this.showAssistant();
-		}
-	}
-
-	async getPreviousDailyNotes(): Promise<string> {
-		const files = this.app.vault.getMarkdownFiles();
-		const dailyNotePattern = /^\d{4}-\d{2}-\d{2}$/;
-		const dailyNotes = files
-			.filter(file => dailyNotePattern.test(file.basename))
-			.sort((a, b) => b.basename.localeCompare(a.basename))
-			.slice(0, this.settings.daysOfContext);
-
-		if (dailyNotes.length === 0) {
-			return "No previous daily notes found.";
-		}
-
-		let context = "";
-		for (const note of dailyNotes) {
-			const content = await this.app.vault.read(note);
-			const summary = content.substring(0, 300).replace(/\n/g, ' ');
-			context += `\n[${note.basename}]: ${summary}...`;
-		}
-		return context;
-	}
-
-	async callLMStudio(messages: Message[]): Promise<string> {
-		try {
-			const response = await requestUrl({
-				url: `${this.settings.lmStudioUrl}/chat/completions`,
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model: this.settings.modelName || 'local-model',
-					messages: messages,
-					temperature: this.settings.temperature,
-					max_tokens: this.settings.maxTokens,
-					stream: false
-				})
-			});
-
-			if (response.status === 200) {
-				return response.json.choices[0]?.message?.content || '';
-			} else {
-				throw new Error(`LM Studio returned status ${response.status}`);
-			}
-		} catch (error) {
-			console.error('LM Studio API error:', error);
-			throw new Error('Failed to connect to LM Studio. Make sure it\'s running and a model is loaded.');
-		}
+	onunload() {
+		this.floatingPopover?.destroy();
 	}
 }
 
-class AIAssistantView extends ItemView {
+// Base class for shared functionality
+class AIAssistantBase {
 	plugin: DailyAIAssistantPlugin;
-	containerEl: HTMLElement;
-	isVisible = false;
-	isMinimized = false;
-	isAnalyzing = false;
-
 	chatHistory: Message[] = [];
 	conversationEl: HTMLElement;
 	inputEl: HTMLTextAreaElement;
 	sendButton: HTMLButtonElement;
-	statusEl: HTMLElement;
-	headerEl: HTMLElement;
-	bodyEl: HTMLElement;
+	analyzeButton: HTMLButtonElement;
+	clearButton: HTMLButtonElement;
+	loadingEl: HTMLElement;
+	contextInfoEl: HTMLElement;
+	isLoading = false;
 
-	currentFile: TFile | null = null;
+	constructor(plugin: DailyAIAssistantPlugin) {
+		this.plugin = plugin;
+	}
+
+	setLoading(loading: boolean) {
+		this.isLoading = loading;
+		this.inputEl.disabled = loading;
+		this.sendButton.disabled = loading;
+		this.analyzeButton.disabled = loading;
+
+		if (loading) {
+			this.loadingEl?.removeClass('hidden');
+		} else {
+			this.loadingEl?.addClass('hidden');
+		}
+	}
+
+	updateContextInfo() {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (activeFile && this.contextInfoEl) {
+			const openTabs = this.plugin.app.workspace.getLeavesOfType('markdown').length;
+			this.contextInfoEl.setText(`📄 ${activeFile.basename} | 📑 ${openTabs} tabs deschise`);
+		}
+	}
+
+	clearConversation() {
+		this.chatHistory = [];
+		this.conversationEl.empty();
+		new Notice('Conversație ștearsă');
+	}
+
+	async analyzeCurrentDocument(containerEl: HTMLElement) {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice('No active file');
+			return;
+		}
+
+		const content = await this.plugin.app.vault.read(activeFile);
+		if (content.trim().length < 50) {
+			this.addMessage('system', 'Document prea scurt. Scrie mai întâi ceva!', containerEl);
+			return;
+		}
+
+		this.setLoading(true);
+		this.updateContextInfo();
+
+		const previousContext = await this.plugin.getPreviousDailyNotes();
+		const tabsContext = await this.plugin.getOpenTabsContext();
+		const personalityPrompt = PERSONALITY_PROMPTS[this.plugin.settings.personality];
+
+		const analysisPrompt: Message = {
+			role: 'system',
+			content: `${personalityPrompt}
+
+Analizează documentul curent și oferă observații sau întrebări pentru reflecție.
+
+Document curent: ${activeFile.basename}
+Conținut: ${content.substring(0, 1000)}
+
+Context zile anterioare:
+${previousContext}${tabsContext}`
+		};
+
+		this.chatHistory = [analysisPrompt];
+
+		try {
+			const insight = await this.plugin.callLMStudio([analysisPrompt]);
+			this.addMessage('assistant', insight, containerEl);
+			this.chatHistory.push({ role: 'assistant', content: insight });
+		} catch (error) {
+			new Notice('Eroare: ' + error.message);
+			this.addMessage('system', 'Eroare: ' + error.message, containerEl);
+		} finally {
+			this.setLoading(false);
+		}
+	}
+
+	async sendMessage(containerEl: HTMLElement) {
+		const message = this.inputEl.value.trim();
+		if (!message) return;
+
+		this.setLoading(true);
+		this.updateContextInfo();
+
+		this.chatHistory.push({ role: 'user', content: message });
+		this.addMessage('user', message, containerEl);
+		this.inputEl.value = '';
+
+		const thinkingEl = this.conversationEl.createDiv('ai-message ai-message-thinking');
+		thinkingEl.setText('🤔 Mă gândesc...');
+
+		try {
+			const response = await this.plugin.callLMStudio(this.chatHistory);
+			thinkingEl.remove();
+
+			this.chatHistory.push({ role: 'assistant', content: response });
+			this.addMessage('assistant', response, containerEl);
+		} catch (error) {
+			thinkingEl.remove();
+			this.addMessage('system', 'Eroare: ' + error.message, containerEl);
+		} finally {
+			this.setLoading(false);
+			this.inputEl.focus();
+		}
+	}
+
+	addMessage(role: string, content: string, containerEl: HTMLElement) {
+		const messageEl = containerEl.createDiv(`ai-message ai-message-${role}`);
+
+		const icon = messageEl.createSpan('ai-message-icon');
+		if (role === 'assistant') icon.setText('🤖');
+		else if (role === 'user') icon.setText('👤');
+		else icon.setText('ℹ️');
+
+		const contentSpan = messageEl.createSpan('ai-message-content');
+		contentSpan.setText(content);
+
+		containerEl.scrollTop = containerEl.scrollHeight;
+	}
+}
+
+// Sidebar View
+class AIAssistantSidebarView extends ItemView {
+	plugin: DailyAIAssistantPlugin;
+	base: AIAssistantBase;
+	containerEl: HTMLElement;
 
 	constructor(leaf: WorkspaceLeaf, plugin: DailyAIAssistantPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+		this.base = new AIAssistantBase(plugin);
 	}
 
 	getViewType(): string {
@@ -286,202 +463,229 @@ class AIAssistantView extends ItemView {
 	async onOpen() {
 		this.containerEl = this.contentEl;
 		this.containerEl.empty();
-		this.containerEl.addClass('ai-assistant-container');
+		this.containerEl.addClass('ai-assistant-sidebar');
 
 		this.buildUI();
-		this.show(); // Show by default when panel opens
 	}
 
 	buildUI() {
-		// Header with title and controls
-		this.headerEl = this.containerEl.createDiv('ai-assistant-header');
+		// Header
+		const header = this.containerEl.createDiv('ai-assistant-header');
+		const title = header.createDiv('ai-assistant-title');
+		title.createSpan({ text: '🤖 AI Assistant' });
 
-		const titleEl = this.headerEl.createDiv('ai-assistant-title');
-		titleEl.createSpan({ text: '🤖', cls: 'ai-assistant-icon' });
-		titleEl.createSpan({ text: 'AI Assistant', cls: 'ai-assistant-title-text' });
+		const controls = header.createDiv('ai-assistant-controls');
 
-		const controlsEl = this.headerEl.createDiv('ai-assistant-controls');
+		// Clear button
+		this.base.clearButton = controls.createEl('button', { text: '🗑️', attr: { 'aria-label': 'Clear conversation' } });
+		this.base.clearButton.onclick = () => this.base.clearConversation();
 
-		const minimizeBtn = controlsEl.createEl('button', { text: '−', cls: 'ai-assistant-btn-minimize' });
-		minimizeBtn.onclick = () => this.toggleMinimize();
+		// Pin/Unpin button
+		const unpinBtn = controls.createEl('button', { text: '📌', attr: { 'aria-label': 'Unpin to floating' } });
+		unpinBtn.onclick = () => this.plugin.switchToFloating();
 
-		// Body (can be minimized)
-		this.bodyEl = this.containerEl.createDiv('ai-assistant-body');
+		// Body
+		const body = this.containerEl.createDiv('ai-assistant-body');
 
-		// Status indicator
-		this.statusEl = this.bodyEl.createDiv('ai-status-indicator');
+		// Context info
+		this.base.contextInfoEl = body.createDiv('ai-context-info');
+		this.base.updateContextInfo();
 
 		// Conversation area
-		this.conversationEl = this.bodyEl.createDiv('ai-conversation-area');
+		this.base.conversationEl = body.createDiv('ai-conversation-area');
+
+		// Loading indicator
+		this.base.loadingEl = body.createDiv('ai-loading hidden');
+		this.base.loadingEl.setText('⏳ Se încarcă...');
 
 		// Input area
-		const inputContainer = this.bodyEl.createDiv('ai-input-container');
+		const inputContainer = body.createDiv('ai-input-container');
+		this.base.inputEl = inputContainer.createEl('textarea', {
+			placeholder: 'Întreabă-mă ceva...',
+			attr: { rows: '2' }
+		});
 
+		this.base.inputEl.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault();
+				this.base.sendMessage(this.base.conversationEl);
+			}
+		});
+
+		const buttonContainer = inputContainer.createDiv('ai-button-container');
+		this.base.sendButton = buttonContainer.createEl('button', { text: 'Trimite', cls: 'ai-btn-send' });
+		this.base.sendButton.onclick = () => this.base.sendMessage(this.base.conversationEl);
+
+		this.base.analyzeButton = buttonContainer.createEl('button', { text: 'Analizează', cls: 'ai-btn-analyze' });
+		this.base.analyzeButton.onclick = () => this.base.analyzeCurrentDocument(this.base.conversationEl);
+	}
+
+	async onClose() {
+		// Cleanup if needed
+	}
+}
+
+// Floating Popover
+class AIAssistantPopover extends AIAssistantBase {
+	containerEl: HTMLElement;
+	visible = false;
+
+	constructor(plugin: DailyAIAssistantPlugin) {
+		super(plugin);
+		this.createPopover();
+		this.makeDraggable();
+		this.makeResizable();
+	}
+
+	createPopover() {
+		this.containerEl = document.body.createDiv('ai-assistant-popover');
+
+		// Header
+		const header = this.containerEl.createDiv('ai-assistant-header');
+		const title = header.createDiv('ai-assistant-title');
+		title.createSpan({ text: '🤖 AI Assistant' });
+
+		const controls = header.createDiv('ai-assistant-controls');
+
+		// Clear button
+		this.clearButton = controls.createEl('button', { text: '🗑️', attr: { 'aria-label': 'Clear conversation' } });
+		this.clearButton.onclick = () => this.clearConversation();
+
+		// Pin button
+		const pinBtn = controls.createEl('button', { text: '📌', attr: { 'aria-label': 'Pin to sidebar' } });
+		pinBtn.onclick = () => this.plugin.switchToSidebar();
+
+		const minimizeBtn = controls.createEl('button', { text: '−' });
+		minimizeBtn.onclick = () => this.toggleMinimize();
+
+		const closeBtn = controls.createEl('button', { text: '×' });
+		closeBtn.onclick = () => this.hide();
+
+		// Body
+		const body = this.containerEl.createDiv('ai-assistant-body');
+
+		// Context info
+		this.contextInfoEl = body.createDiv('ai-context-info');
+		this.updateContextInfo();
+
+		// Conversation area
+		this.conversationEl = body.createDiv('ai-conversation-area');
+
+		// Loading indicator
+		this.loadingEl = body.createDiv('ai-loading hidden');
+		this.loadingEl.setText('⏳ Se încarcă...');
+
+		// Input area
+		const inputContainer = body.createDiv('ai-input-container');
 		this.inputEl = inputContainer.createEl('textarea', {
-			placeholder: 'Ask me anything...',
+			placeholder: 'Întreabă-mă ceva...',
 			attr: { rows: '2' }
 		});
 
 		this.inputEl.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
-				this.sendMessage();
+				this.sendMessage(this.conversationEl);
 			}
 		});
 
 		const buttonContainer = inputContainer.createDiv('ai-button-container');
+		this.sendButton = buttonContainer.createEl('button', { text: 'Trimite', cls: 'ai-btn-send' });
+		this.sendButton.onclick = () => this.sendMessage(this.conversationEl);
 
-		this.sendButton = buttonContainer.createEl('button', { text: 'Send', cls: 'ai-btn-send' });
-		this.sendButton.onclick = () => this.sendMessage();
+		this.analyzeButton = buttonContainer.createEl('button', { text: 'Analizează', cls: 'ai-btn-analyze' });
+		this.analyzeButton.onclick = () => this.analyzeCurrentDocument(this.conversationEl);
 
-		const analyzeBtn = buttonContainer.createEl('button', { text: 'Analyze Doc', cls: 'ai-btn-analyze' });
-		analyzeBtn.onclick = () => this.analyzeCurrentDocument();
+		// Resize handles
+		this.createResizeHandles();
 
-		// Initial greeting
-		this.addMessage('assistant', 'Hi! I\'m your AI assistant. I can help you reflect on your day or analyze your current document. What would you like to talk about?');
+		// Initial position
+		this.containerEl.style.left = '50px';
+		this.containerEl.style.top = '100px';
+		this.containerEl.style.width = '400px';
+		this.containerEl.style.height = '500px';
+	}
+
+	createResizeHandles() {
+		['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right']
+			.forEach(pos => {
+				this.containerEl.createDiv(`resize-handle ${pos}`);
+			});
+	}
+
+	makeDraggable() {
+		interact(this.containerEl)
+			.draggable({
+				allowFrom: '.ai-assistant-header',
+				modifiers: [
+					interact.modifiers.restrictRect({
+						restriction: 'parent',
+						endOnly: true
+					})
+				],
+				listeners: {
+					move: (event) => {
+						const target = event.target;
+						const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+						const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+						target.style.transform = `translate(${x}px, ${y}px)`;
+						target.setAttribute('data-x', x.toString());
+						target.setAttribute('data-y', y.toString());
+					}
+				}
+			});
+	}
+
+	makeResizable() {
+		interact(this.containerEl)
+			.resizable({
+				edges: { left: '.left', right: '.right', bottom: '.bottom', top: '.top' },
+				modifiers: [
+					interact.modifiers.restrictSize({
+						min: { width: 300, height: 200 }
+					})
+				],
+				listeners: {
+					move: (event) => {
+						const target = event.target;
+						let x = parseFloat(target.getAttribute('data-x')) || 0;
+						let y = parseFloat(target.getAttribute('data-y')) || 0;
+
+						target.style.width = `${event.rect.width}px`;
+						target.style.height = `${event.rect.height}px`;
+
+						x += event.deltaRect.left;
+						y += event.deltaRect.top;
+
+						target.style.transform = `translate(${x}px, ${y}px)`;
+						target.setAttribute('data-x', x.toString());
+						target.setAttribute('data-y', y.toString());
+					}
+				}
+			});
 	}
 
 	show() {
-		this.containerEl.style.display = 'flex';
-		this.isVisible = true;
+		this.containerEl.show();
+		this.visible = true;
 	}
 
 	hide() {
-		this.containerEl.style.display = 'none';
-		this.isVisible = false;
+		this.containerEl.hide();
+		this.visible = false;
+	}
+
+	isVisible() {
+		return this.visible;
 	}
 
 	toggleMinimize() {
-		this.isMinimized = !this.isMinimized;
-		if (this.isMinimized) {
-			this.bodyEl.style.display = 'none';
-			this.containerEl.addClass('minimized');
-		} else {
-			this.bodyEl.style.display = 'flex';
-			this.containerEl.removeClass('minimized');
-		}
-	}
-
-	async analyzeCurrentDocument() {
-		if (this.isAnalyzing) return;
-
-		const activeFile = this.app.workspace.getActiveFile();
-		if (!activeFile) {
-			this.showStatus('No document open', 'error');
-			return;
-		}
-
-		this.currentFile = activeFile;
-		this.isAnalyzing = true;
-		this.showStatus('Analyzing document...', 'loading');
-
-		try {
-			const content = await this.app.vault.read(activeFile);
-
-			// Check if document has enough content to analyze
-			const minContentLength = 50; // Minimum 50 characters
-			if (content.trim().length < minContentLength) {
-				this.hideStatus();
-				this.addMessage('system', 'Document is too short to analyze. Write something first, then click "Analyze Document" for insights!');
-				this.isAnalyzing = false;
-				return;
-			}
-
-			const previousContext = await this.plugin.getPreviousDailyNotes();
-			const personalityPrompt = PERSONALITY_PROMPTS[this.plugin.settings.personality];
-
-			// Create analysis prompt
-			const analysisPrompt: Message = {
-				role: 'system',
-				content: `${personalityPrompt}
-
-Analyze the current document and provide observations or questions to help the user reflect.
-
-Current document: ${activeFile.basename}
-Content: ${content.substring(0, 1000)}
-
-Previous daily notes context:
-${previousContext}`
-			};
-
-			this.chatHistory = [analysisPrompt];
-
-			const insight = await this.plugin.callLMStudio([analysisPrompt]);
-
-			this.hideStatus();
-			this.addMessage('assistant', insight);
-			this.chatHistory.push({ role: 'assistant', content: insight });
-
-		} catch (error) {
-			this.showStatus('Failed to analyze: ' + error.message, 'error');
-		} finally {
-			this.isAnalyzing = false;
-		}
-	}
-
-	async sendMessage() {
-		const message = this.inputEl.value.trim();
-		if (!message) return;
-
-		this.inputEl.disabled = true;
-		this.sendButton.disabled = true;
-
-		// Add user message
-		this.chatHistory.push({ role: 'user', content: message });
-		this.addMessage('user', message);
-		this.inputEl.value = '';
-
-		// Show thinking
-		const thinkingEl = this.conversationEl.createDiv('ai-message ai-message-assistant ai-message-thinking');
-		thinkingEl.setText('🤔 Thinking...');
-
-		try {
-			const response = await this.plugin.callLMStudio(this.chatHistory);
-			thinkingEl.remove();
-
-			this.chatHistory.push({ role: 'assistant', content: response });
-			this.addMessage('assistant', response);
-		} catch (error) {
-			thinkingEl.remove();
-			this.addMessage('system', 'Error: ' + error.message);
-			this.showStatus('Error: ' + error.message, 'error');
-		}
-
-		this.inputEl.disabled = false;
-		this.sendButton.disabled = false;
-		this.inputEl.focus();
-	}
-
-	addMessage(role: string, content: string) {
-		const messageEl = this.conversationEl.createDiv(`ai-message ai-message-${role}`);
-
-		const icon = messageEl.createSpan('ai-message-icon');
-		if (role === 'assistant') icon.setText('🤖');
-		else if (role === 'user') icon.setText('👤');
-		else icon.setText('ℹ️');
-
-		const contentSpan = messageEl.createSpan('ai-message-content');
-		contentSpan.setText(content);
-
-		this.conversationEl.scrollTop = this.conversationEl.scrollHeight;
-	}
-
-	showStatus(text: string, type: 'loading' | 'success' | 'error') {
-		this.statusEl.setText(text);
-		this.statusEl.className = `ai-status-indicator ai-status-${type}`;
-		this.statusEl.style.display = 'block';
-	}
-
-	hideStatus() {
-		this.statusEl.style.display = 'none';
+		this.containerEl.toggleClass('minimized', !this.containerEl.hasClass('minimized'));
 	}
 
 	destroy() {
 		this.containerEl.remove();
-	}
-
-	async onClose() {
-		this.destroy();
 	}
 }
 
@@ -499,7 +703,32 @@ class DailyAIAssistantSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', { text: 'Daily AI Assistant Settings' });
 
-		// LM Studio connection
+		// Display mode
+		containerEl.createEl('h3', { text: 'Display Mode' });
+
+		new Setting(containerEl)
+			.setName('Default Mode')
+			.setDesc('Choose between floating popover or pinned sidebar panel')
+			.addDropdown(dropdown => dropdown
+				.addOption('floating', 'Floating Popover')
+				.addOption('sidebar', 'Sidebar Panel')
+				.setValue(this.plugin.settings.defaultMode)
+				.onChange(async (value: DisplayMode) => {
+					this.plugin.settings.defaultMode = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Include Open Tabs Context')
+			.setDesc('Include content from open tabs in analysis')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.includeOpenTabs)
+				.onChange(async (value) => {
+					this.plugin.settings.includeOpenTabs = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// LM Studio settings
 		containerEl.createEl('h3', { text: 'LM Studio Connection' });
 
 		new Setting(containerEl)
@@ -514,35 +743,8 @@ class DailyAIAssistantSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Test Connection')
-			.setDesc('Check if LM Studio is running and accessible')
-			.addButton(button => button
-				.setButtonText('Test Connection')
-				.onClick(async () => {
-					button.setDisabled(true);
-					button.setButtonText('Testing...');
-					const isConnected = await this.plugin.checkLMStudioConnection();
-					if (isConnected) {
-						new Notice('✓ Successfully connected to LM Studio!');
-						const models = await this.plugin.getAvailableModels();
-						if (models.length > 0) {
-							new Notice(`Found ${models.length} model(s)`);
-							if (!this.plugin.settings.modelName) {
-								this.plugin.settings.modelName = models[0];
-								await this.plugin.saveSettings();
-								this.display();
-							}
-						}
-					} else {
-						new Notice('✗ Cannot connect to LM Studio');
-					}
-					button.setDisabled(false);
-					button.setButtonText('Test Connection');
-				}));
-
-		new Setting(containerEl)
 			.setName('Model Name')
-			.setDesc('The model identifier (auto-detected if left empty)')
+			.setDesc('Leave empty for auto-detection')
 			.addText(text => text
 				.setPlaceholder('local-model')
 				.setValue(this.plugin.settings.modelName)
@@ -565,23 +767,13 @@ class DailyAIAssistantSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Auto-analyze documents')
-			.setDesc('Automatically analyze when switching to a new document')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoAnalyze)
-				.onChange(async (value) => {
-					this.plugin.settings.autoAnalyze = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
 			.setName('Assistant Personality')
-			.setDesc('Choose how the assistant responds (in Romanian). Focuses on: gym/sports, personal development, relaxation, daily habits.')
+			.setDesc('Choose how the assistant responds (in Romanian)')
 			.addDropdown(dropdown => dropdown
-				.addOption('concise', 'Concis - Scurt și direct (1-2 propoziții)')
-				.addOption('balanced', 'Echilibrat - Prietenos și gânditor (2-3 propoziții)')
-				.addOption('reflective', 'Reflectiv - Psiholog AI, insight-uri profunde (3-4 propoziții)')
-				.addOption('poetic', 'Poetic - Creativ și expresiv')
+				.addOption('concise', 'Concis - Scurt și direct')
+				.addOption('balanced', 'Echilibrat - Prietenos')
+				.addOption('reflective', 'Reflectiv - Psiholog AI')
+				.addOption('poetic', 'Poetic - Creativ')
 				.setValue(this.plugin.settings.personality)
 				.onChange(async (value: PersonalityPreset) => {
 					this.plugin.settings.personality = value;
@@ -617,7 +809,7 @@ class DailyAIAssistantSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Temperature')
-			.setDesc('Controls creativity (0.0 = focused, 1.0 = creative)')
+			.setDesc('Controls creativity (0.0-1.0)')
 			.addSlider(slider => slider
 				.setLimits(0, 1, 0.1)
 				.setValue(this.plugin.settings.temperature)
@@ -626,17 +818,5 @@ class DailyAIAssistantSettingTab extends PluginSettingTab {
 					this.plugin.settings.temperature = value;
 					await this.plugin.saveSettings();
 				}));
-
-		// Instructions
-		const instructionsEl = containerEl.createEl('div', { cls: 'setting-item-description' });
-		instructionsEl.innerHTML = `
-			<h3>Quick Start:</h3>
-			<ol>
-				<li>Download <a href="https://lmstudio.ai/">LM Studio</a> and install a model</li>
-				<li>Start the LM Studio server (↔ icon)</li>
-				<li>Click "Test Connection" above</li>
-				<li>Click the 💬 icon in Obsidian to toggle the assistant</li>
-			</ol>
-		`;
 	}
 }

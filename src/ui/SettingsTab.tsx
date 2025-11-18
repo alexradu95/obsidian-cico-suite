@@ -40,19 +40,6 @@ export class DailyAIAssistantSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', { text: 'Daily AI Assistant Settings' });
 
-		// Context settings
-		containerEl.createEl('h3', { text: 'Context Settings' });
-
-		new Setting(containerEl)
-			.setName('Include Open Tabs Context')
-			.setDesc('Include content from open tabs in analysis')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.includeOpenTabs)
-				.onChange(async (value) => {
-					this.plugin.settings.includeOpenTabs = value;
-					await this.plugin.saveSettings();
-				}));
-
 		// LM Studio settings
 		containerEl.createEl('h3', { text: 'LM Studio Connection' });
 
@@ -105,20 +92,6 @@ export class DailyAIAssistantSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		// Conversation settings
-		containerEl.createEl('h3', { text: 'Conversation Settings' });
-
-		new Setting(containerEl)
-			.setName('Days of context')
-			.setDesc('Number of previous daily notes to consider')
-			.addSlider(slider => slider
-				.setLimits(1, 14, 1)
-				.setValue(this.plugin.settings.daysOfContext)
-				.setDynamicTooltip()
-				.onChange(async (value) => {
-					this.plugin.settings.daysOfContext = value;
-					await this.plugin.saveSettings();
-				}));
 
 		new Setting(containerEl)
 			.setName('Max response tokens')

@@ -30,6 +30,10 @@ interface ContextFile {
 	path: string;
 	name: string;
 	content?: string;
+	isCurrentTab?: boolean; // True if this is the current active file
+	isEnabled?: boolean; // Whether the file is enabled in context (for current tab)
+	isPastDailyNote?: boolean; // True if this is a past daily note
+	isFutureDailyNote?: boolean; // True if this is a future daily note
 }
 
 /**
@@ -56,6 +60,9 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 	const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
 	const [showFileSuggestions, setShowFileSuggestions] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [pastDays, setPastDays] = useState(plugin.settings.pastDailyNotesInContext);
+	const [futureDays, setFutureDays] = useState(plugin.settings.futureDailyNotesInContext);
+	const [showContextControls, setShowContextControls] = useState(false);
 	const conversationRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,6 +72,8 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 		const activeFile = app.workspace.getActiveFile();
 		if (!activeFile) {
 			setContextData(null);
+			// Remove current tab and daily notes from context files
+			setContextFiles(prev => prev.filter(f => !f.isCurrentTab && !f.isPastDailyNote && !f.isFutureDailyNote));
 			return;
 		}
 
@@ -79,11 +88,77 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 				previousContext,
 				tabsContext
 			});
+
+			// Add or update current tab in context files
+			const currentTabFile: ContextFile = {
+				path: activeFile.path,
+				name: activeFile.basename,
+				content: content.substring(0, 2000),
+				isCurrentTab: true,
+				isEnabled: true // Enabled by default
+			};
+
+			// Check if current file is a daily note
+			const isDailyNote = aiService.isDailyNote(activeFile);
+			let pastDailyNotes: ContextFile[] = [];
+			let futureDailyNotes: ContextFile[] = [];
+
+			if (isDailyNote) {
+				const files = app.vault.getMarkdownFiles();
+				const allDailyNotes = files
+					.filter(f => aiService.isDailyNote(f))
+					.filter(f => f.path !== activeFile.path) // Exclude current file
+					.sort((a, b) => a.basename.localeCompare(b.basename)); // Sort chronologically
+
+				// Split into past and future notes based on current file
+				const currentDate = activeFile.basename;
+				const pastNotes = allDailyNotes.filter(f => f.basename < currentDate).reverse(); // Most recent first
+				const futureNotes = allDailyNotes.filter(f => f.basename > currentDate);
+
+				// Load past daily notes
+				if (pastDays > 0) {
+					const notesToLoad = pastNotes.slice(0, pastDays);
+					for (const note of notesToLoad) {
+						const noteContent = await app.vault.read(note);
+						pastDailyNotes.push({
+							path: note.path,
+							name: note.basename,
+							content: noteContent.substring(0, 1000),
+							isPastDailyNote: true,
+							isEnabled: true
+						});
+					}
+				}
+
+				// Load future daily notes
+				if (futureDays > 0) {
+					const notesToLoad = futureNotes.slice(0, futureDays);
+					for (const note of notesToLoad) {
+						const noteContent = await app.vault.read(note);
+						futureDailyNotes.push({
+							path: note.path,
+							name: note.basename,
+							content: noteContent.substring(0, 1000),
+							isFutureDailyNote: true,
+							isEnabled: true
+						});
+					}
+				}
+			}
+
+			setContextFiles(prev => {
+				// Remove old current tab and daily notes, keep manually added files
+				const manualFiles = prev.filter(f => !f.isCurrentTab && !f.isPastDailyNote && !f.isFutureDailyNote);
+				// Return current tab first, then past daily notes, future daily notes, then manual files
+				return [currentTabFile, ...pastDailyNotes, ...futureDailyNotes, ...manualFiles];
+			});
 		} catch (error) {
 			console.error('Failed to load context:', error);
 			setContextData(null);
+			// Remove current tab and daily notes from context files on error
+			setContextFiles(prev => prev.filter(f => !f.isCurrentTab && !f.isPastDailyNote && !f.isFutureDailyNote));
 		}
-	}, [app, aiService]);
+	}, [app, aiService, pastDays, futureDays]);
 
 	// Load context on mount and when active file changes
 	useEffect(() => {
@@ -104,10 +179,11 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 
 	// Automatically provide greeting when context is first loaded
 	useEffect(() => {
-		if (contextData && !hasGreeted && chatHistory.length === 0) {
+		if (contextData && !hasGreeted && chatHistory.length === 0 && contextFiles.length > 0) {
 			setHasGreeted(true);
 			provideInitialGreeting();
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [contextData, hasGreeted, chatHistory.length]);
 
 	const provideInitialGreeting = useCallback(async () => {
@@ -116,17 +192,48 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 		setIsLoading(true);
 		const personalityPrompt = PERSONALITY_PROMPTS[plugin.settings.personality];
 
+		// Check if current tab is enabled
+		const currentTab = contextFiles.find(f => f.isCurrentTab);
+		const isCurrentTabEnabled = currentTab ? currentTab.isEnabled : true;
+
+		let greetingContent = `${personalityPrompt}\n\nUtilizatorul tocmai a deschis asistentul. Oferă o întrebare sau observație scurtă și relevantă bazată pe contextul curent.`;
+
+		// Only include current document if it's enabled
+		if (isCurrentTabEnabled && currentTab) {
+			greetingContent += `\n\nDocument activ: ${currentTab.name}\nConținut: ${currentTab.content}`;
+		}
+
+		// Include past daily notes if any
+		const pastDailyNotes = contextFiles.filter(f => f.isPastDailyNote);
+		if (pastDailyNotes.length > 0) {
+			greetingContent += '\n\nZile anterioare în context:';
+			for (const note of pastDailyNotes) {
+				greetingContent += `\n\nFișier: ${note.name}\nConținut: ${note.content}`;
+			}
+		}
+
+		// Include future daily notes if any
+		const futureDailyNotes = contextFiles.filter(f => f.isFutureDailyNote);
+		if (futureDailyNotes.length > 0) {
+			greetingContent += '\n\nZile viitoare în context:';
+			for (const note of futureDailyNotes) {
+				greetingContent += `\n\nFișier: ${note.name}\nConținut: ${note.content}`;
+			}
+		}
+
+		// Always include previous days context if available (for other days not shown)
+		if (contextData.previousContext) {
+			greetingContent += `\n\nAlte zile anterioare:\n${contextData.previousContext}`;
+		}
+
+		// Only include tabs context if current tab is enabled (since tabs context includes current file)
+		if (contextData.tabsContext && isCurrentTabEnabled) {
+			greetingContent += `\n\nTab-uri deschise:${contextData.tabsContext}`;
+		}
+
 		const greetingPrompt: Message = {
 			role: 'system',
-			content: `${personalityPrompt}
-
-Utilizatorul tocmai a deschis asistentul. Oferă o întrebare sau observație scurtă și relevantă bazată pe contextul curent.
-
-Document activ: ${contextData.activeFile}
-Conținut: ${contextData.content}
-
-Context zile anterioare:
-${contextData.previousContext}${contextData.tabsContext}`
+			content: greetingContent
 		};
 
 		try {
@@ -137,7 +244,7 @@ ${contextData.previousContext}${contextData.tabsContext}`
 		} finally {
 			setIsLoading(false);
 		}
-	}, [contextData, plugin.settings.personality, aiService]);
+	}, [contextData, contextFiles, plugin.settings.personality, aiService]);
 
 	// Handle adding a context file
 	const addContextFile = useCallback(async (file: TFile) => {
@@ -158,10 +265,39 @@ ${contextData.previousContext}${contextData.tabsContext}`
 		}
 	}, [app.vault, contextFiles]);
 
-	// Handle removing a context file
+	// Handle removing a context file (only for manually added files, not current tab or daily notes)
 	const removeContextFile = useCallback((path: string) => {
-		setContextFiles(prev => prev.filter(f => f.path !== path));
+		setContextFiles(prev => prev.filter(f => f.path !== path || f.isCurrentTab || f.isPastDailyNote || f.isFutureDailyNote));
 	}, []);
+
+	// Toggle current tab enabled/disabled state
+	const toggleCurrentTab = useCallback(() => {
+		setContextFiles(prev => prev.map(f =>
+			f.isCurrentTab
+				? { ...f, isEnabled: !f.isEnabled }
+				: f
+		));
+	}, []);
+
+	// Handle changing past days
+	const handlePastDaysChange = useCallback(async (value: number) => {
+		setPastDays(value);
+		// Save to plugin settings
+		plugin.settings.pastDailyNotesInContext = value;
+		await plugin.saveSettings();
+		// Reload context with new value
+		loadContext();
+	}, [plugin, loadContext]);
+
+	// Handle changing future days
+	const handleFutureDaysChange = useCallback(async (value: number) => {
+		setFutureDays(value);
+		// Save to plugin settings
+		plugin.settings.futureDailyNotesInContext = value;
+		await plugin.saveSettings();
+		// Reload context with new value
+		loadContext();
+	}, [plugin, loadContext]);
 
 	// Get file suggestions based on search query
 	const getFileSuggestions = useCallback(() => {
@@ -223,7 +359,8 @@ ${contextData.previousContext}${contextData.tabsContext}`
 	const clearConversation = useCallback(() => {
 		setChatHistory([]);
 		setHasGreeted(false);
-		setContextFiles([]); // Clear context files too
+		// Only keep the current tab and daily notes, remove manually added files
+		setContextFiles(prev => prev.filter(f => f.isCurrentTab || f.isPastDailyNote || f.isFutureDailyNote));
 		new Notice('Conversație ștearsă');
 		onClear?.();
 		// Reload context and provide new greeting
@@ -261,35 +398,39 @@ ${contextData.previousContext}${contextData.tabsContext}`
 			// Build context prompt
 			let contextPrompt = personalityPrompt;
 
-			// Add context files if any
-			if (contextFiles.length > 0) {
+			// Add context files if any (only enabled ones, daily notes are always enabled)
+			const enabledFiles = contextFiles.filter(f =>
+				f.isPastDailyNote || f.isFutureDailyNote || // Daily notes are always enabled
+				(!f.isCurrentTab || f.isEnabled) // Other files must be enabled
+			);
+			if (enabledFiles.length > 0) {
 				contextPrompt += '\n\nFișiere în context:';
-				for (const file of contextFiles) {
-					contextPrompt += `\n\nFișier: ${file.name}\nConținut:\n${file.content}`;
+				for (const file of enabledFiles) {
+					const fileType = file.isPastDailyNote ? ' (zi anterioară)' :
+									file.isFutureDailyNote ? ' (zi viitoare)' : '';
+					contextPrompt += `\n\nFișier: ${file.name}${fileType}\nConținut:\n${file.content}`;
 				}
 			}
 
-			// Add system prompt with context if available
-			if (contextData) {
-				contextualHistory.push({
-					role: 'system',
-					content: `${contextPrompt}
+			// Check if current tab is disabled in context files
+			const currentTabDisabled = contextFiles.some(f => f.isCurrentTab && !f.isEnabled);
 
-Context actual:
-Document activ: ${contextData.activeFile}
-Conținut: ${contextData.content}
-
-Context zile anterioare:
-${contextData.previousContext}${contextData.tabsContext}
-
-Răspunde la întrebarea utilizatorului având în vedere contextul de mai sus.`
-				});
-			} else {
-				contextualHistory.push({
-					role: 'system',
-					content: contextPrompt
-				});
+			// Always add previous days context if available
+			if (contextData && contextData.previousContext) {
+				contextPrompt += '\n\nContext zile anterioare:';
+				contextPrompt += `\n${contextData.previousContext}`;
 			}
+
+			// Only add tabs context if current tab is enabled (since tabs context includes current file)
+			if (contextData && contextData.tabsContext && !currentTabDisabled) {
+				contextPrompt += '\n\nTab-uri deschise:';
+				contextPrompt += `${contextData.tabsContext}`;
+			}
+
+			contextualHistory.push({
+				role: 'system',
+				content: contextPrompt + '\n\nRăspunde la întrebarea utilizatorului având în vedere contextul de mai sus.'
+			});
 
 			// Add conversation history (excluding system messages)
 			contextualHistory.push(...newHistory.filter(m => m.role !== 'system'));
@@ -342,19 +483,93 @@ Răspunde la întrebarea utilizatorului având în vedere contextul de mai sus.`
 			{isLoading && <div className="ai-loading">⏳ Se încarcă...</div>}
 
 			<div className="ai-input-container">
+				{/* Context Frame Controls - Only show when viewing a daily note */}
+				{contextFiles.some(f => f.isCurrentTab) &&
+				 app.workspace.getActiveFile() &&
+				 aiService.isDailyNote(app.workspace.getActiveFile()) && (
+					<div className="ai-context-frame">
+						<div className="ai-context-frame-header">
+							<span>📅 Context Frame</span>
+							<button
+								className="ai-context-frame-toggle"
+								onClick={() => setShowContextControls(!showContextControls)}
+							>
+								{showContextControls ? '▼' : '▶'}
+							</button>
+						</div>
+						{showContextControls && (
+							<div className="ai-context-frame-controls">
+								<div className="ai-context-frame-control">
+									<label>Past days: {pastDays}</label>
+									<input
+										type="range"
+										min="0"
+										max="7"
+										value={pastDays}
+										onChange={(e) => handlePastDaysChange(parseInt(e.target.value))}
+										className="ai-context-slider"
+									/>
+								</div>
+								<div className="ai-context-frame-control">
+									<label>Future days: {futureDays}</label>
+									<input
+										type="range"
+										min="0"
+										max="7"
+										value={futureDays}
+										onChange={(e) => handleFutureDaysChange(parseInt(e.target.value))}
+										className="ai-context-slider"
+									/>
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+
 				{/* Context Files Display */}
 				{contextFiles.length > 0 && (
 					<div className="ai-context-files">
 						{contextFiles.map(file => (
-							<div key={file.path} className="ai-context-file">
-								<span className="ai-context-file-name">📄 {file.name}</span>
-								<button
-									className="ai-context-file-remove"
-									onClick={() => removeContextFile(file.path)}
-									title="Remove from context"
-								>
-									×
-								</button>
+							<div
+								key={file.path}
+								className={`ai-context-file ${
+									file.isCurrentTab ? 'ai-context-file-current' : ''
+								} ${
+									file.isPastDailyNote ? 'ai-context-file-daily-past' : ''
+								} ${
+									file.isFutureDailyNote ? 'ai-context-file-daily-future' : ''
+								} ${
+									file.isCurrentTab && !file.isEnabled ? 'ai-context-file-disabled' : ''
+								}`}
+							>
+								<span className="ai-context-file-name">
+									{file.isCurrentTab ? '📋' :
+									 file.isPastDailyNote ? '📅' :
+									 file.isFutureDailyNote ? '📆' : '📄'} {file.name}
+									{file.isCurrentTab && <span className="ai-context-file-badge">Current</span>}
+									{file.isPastDailyNote && <span className="ai-context-file-badge ai-context-file-badge-past">Past</span>}
+									{file.isFutureDailyNote && <span className="ai-context-file-badge ai-context-file-badge-future">Future</span>}
+								</span>
+								{file.isCurrentTab ? (
+									<button
+										className="ai-context-file-toggle"
+										onClick={toggleCurrentTab}
+										title={file.isEnabled ? 'Disable in context' : 'Enable in context'}
+									>
+										{file.isEnabled ? '✓' : '○'}
+									</button>
+								) : (file.isPastDailyNote || file.isFutureDailyNote) ? (
+									// Daily notes don't have any action button
+									null
+								) : (
+									<button
+										className="ai-context-file-remove"
+										onClick={() => removeContextFile(file.path)}
+										title="Remove from context"
+									>
+										×
+									</button>
+								)}
 							</div>
 						))}
 					</div>

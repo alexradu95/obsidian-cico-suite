@@ -40,6 +40,10 @@ export interface DailyAIAssistantSettings {
 	autoShowOnDailyNote: boolean;
 	/** Number of previous daily notes to include as context (default: 7) */
 	daysOfContext: number;
+	/** Number of past daily notes to show when current file is a daily note (default: 3) */
+	pastDailyNotesInContext: number;
+	/** Number of future daily notes to show when current file is a daily note (default: 0) */
+	futureDailyNotesInContext: number;
 	/** Maximum tokens for AI responses (default: 150) */
 	maxTokens: number;
 	/** Temperature for AI generation (0-1, higher = more creative, default: 0.7) */
@@ -61,6 +65,8 @@ export const DEFAULT_SETTINGS: DailyAIAssistantSettings = {
 	modelName: '',
 	autoShowOnDailyNote: true,
 	daysOfContext: 7,
+	pastDailyNotesInContext: 3,
+	futureDailyNotesInContext: 0,
 	maxTokens: 150,
 	temperature: 0.7,
 	personality: 'concise',

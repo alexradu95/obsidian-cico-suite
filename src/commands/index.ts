@@ -1,49 +1,52 @@
 import type DailyAIAssistantPlugin from '../main';
 
+/**
+ * Registers all available commands for the Daily AI Assistant plugin.
+ * Commands are actions that users can trigger via the Command Palette (Ctrl/Cmd+P)
+ * or bind to hotkeys in Obsidian settings.
+ *
+ * @param {DailyAIAssistantPlugin} plugin - The plugin instance to register commands with
+ * @example
+ * // Called during plugin initialization
+ * registerCommands(this);
+ */
 export function registerCommands(plugin: DailyAIAssistantPlugin) {
 	plugin.addCommand({
 		id: 'toggle-ai-assistant',
 		name: 'Toggle AI Assistant',
 		callback: () => toggleAssistant(plugin)
 	});
-
-	plugin.addCommand({
-		id: 'toggle-assistant-mode',
-		name: 'Toggle Between Floating/Sidebar Mode',
-		callback: () => toggleMode(plugin)
-	});
 }
 
+/**
+ * Toggles the visibility of the AI Assistant sidebar panel.
+ * Attaches or detaches the sidebar panel based on current state.
+ *
+ * @param {DailyAIAssistantPlugin} plugin - The plugin instance containing the assistant state
+ * @see showAssistant - Called when assistant needs to be shown
+ * @example
+ * // Usually triggered via command palette or hotkey
+ * toggleAssistant(plugin);
+ */
 export function toggleAssistant(plugin: DailyAIAssistantPlugin) {
-	if (plugin.currentMode === 'floating') {
-		if (plugin.floatingPopover?.isVisible()) {
-			plugin.floatingPopover.hide();
-		} else {
-			showAssistant(plugin);
-		}
+	const leaves = plugin.app.workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT);
+	if (leaves.length > 0) {
+		leaves.forEach(leaf => leaf.detach());
 	} else {
-		const leaves = plugin.app.workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT);
-		if (leaves.length > 0) {
-			leaves.forEach(leaf => leaf.detach());
-		} else {
-			showAssistant(plugin);
-		}
+		showAssistant(plugin);
 	}
 }
 
-async function toggleMode(plugin: DailyAIAssistantPlugin) {
-	if (plugin.currentMode === 'floating') {
-		await switchToSidebar(plugin);
-	} else {
-		await switchToFloating(plugin);
-	}
-}
-
-export async function switchToSidebar(plugin: DailyAIAssistantPlugin) {
-	if (plugin.floatingPopover) {
-		plugin.floatingPopover.hide();
-	}
-
+/**
+ * Shows the AI Assistant in the sidebar.
+ * Creates a sidebar panel if none exists.
+ *
+ * @param {DailyAIAssistantPlugin} plugin - The plugin instance to show the assistant for
+ * @example
+ * // Show assistant when user triggers a command
+ * showAssistant(plugin);
+ */
+export async function showAssistant(plugin: DailyAIAssistantPlugin) {
 	const { workspace } = plugin.app;
 	let leaf = workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT)[0];
 
@@ -58,44 +61,21 @@ export async function switchToSidebar(plugin: DailyAIAssistantPlugin) {
 	if (leaf) {
 		workspace.revealLeaf(leaf);
 	}
-
-	plugin.currentMode = 'sidebar';
 }
 
-export async function switchToFloating(plugin: DailyAIAssistantPlugin) {
-	const leaves = plugin.app.workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT);
-	leaves.forEach(leaf => leaf.detach());
-
-	if (!plugin.floatingPopover) {
-		const { AIAssistantPopover } = await import('../ui/views/PopoverView');
-		plugin.floatingPopover = new AIAssistantPopover(plugin);
-	}
-	plugin.floatingPopover.show();
-
-	plugin.currentMode = 'floating';
-}
-
-export function showAssistant(plugin: DailyAIAssistantPlugin) {
-	if (plugin.currentMode === 'floating') {
-		if (!plugin.floatingPopover) {
-			import('../ui/views/PopoverView').then(({ AIAssistantPopover }) => {
-				plugin.floatingPopover = new AIAssistantPopover(plugin);
-				plugin.floatingPopover.show();
-			});
-		} else {
-			plugin.floatingPopover.show();
-		}
-	} else {
-		const leaves = plugin.app.workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT);
-		if (leaves.length === 0) {
-			switchToSidebar(plugin);
-		}
-	}
-}
-
+/**
+ * Checks if the AI Assistant is currently visible.
+ * Returns true if a sidebar leaf is active.
+ *
+ * @param {DailyAIAssistantPlugin} plugin - The plugin instance to check visibility for
+ * @returns {boolean} True if the assistant is visible, false otherwise
+ * @example
+ * // Check before toggling visibility
+ * if (isAssistantVisible(plugin)) {
+ *   console.log('Assistant is currently visible');
+ * }
+ */
 export function isAssistantVisible(plugin: DailyAIAssistantPlugin): boolean {
 	const leaves = plugin.app.workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT);
-	if (leaves.length > 0) return true;
-	if (plugin.floatingPopover?.isVisible()) return true;
-	return false;
+	return leaves.length > 0;
 }

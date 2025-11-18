@@ -8,7 +8,7 @@ An AI-powered assistant that proactively engages you with thoughtful questions w
 - 📝 **Daily Note Integration**: Automatically activates when you open daily notes
 - 💬 **Interactive Chat**: Have natural conversations with the AI about your day
 - 🎨 **Multiple Personalities**: Choose from concise, balanced, reflective, or poetic response styles
-- 📌 **Flexible UI**: Switch between floating popover and sidebar panel modes
+- 📌 **Sidebar Integration**: Clean integration as a sidebar panel in your workspace
 - 🎯 **Context-Aware**: Analyzes previous daily notes and open tabs for better insights
 - 🌐 **Mobile Compatible**: Works on both desktop and mobile devices
 
@@ -64,10 +64,6 @@ An AI-powered assistant that proactively engages you with thoughtful questions w
   - **Poetic** - Creative and expressive with metaphors
 - **Include Open Tabs Context**: Include content from your open tabs in analysis
 
-### Display Mode
-- **Default Mode**: Choose between floating popover or sidebar panel
-- **Toggle**: Use the command palette or ribbon icon to switch modes
-
 ### Conversation Settings
 - **Days of context**: Number of previous daily notes to consider (1-14)
 - **Max response tokens**: Maximum length of AI responses (50-500)
@@ -78,12 +74,11 @@ An AI-powered assistant that proactively engages you with thoughtful questions w
 ### Basic Usage
 1. Open a daily note (format: `YYYY-MM-DD.md`)
 2. The AI Assistant will automatically appear (if enabled in settings)
-3. Click **Analizează** (Analyze) to get insights about your day
-4. Or type a question to have a conversation
+3. The assistant automatically loads context from your notes and provides insights
+4. Type a question or message to have a conversation
 
 ### Commands
-- **Toggle AI Assistant**: Show/hide the assistant
-- **Toggle Between Floating/Sidebar Mode**: Switch display modes
+- **Toggle AI Assistant**: Show/hide the assistant sidebar
 
 ### Keyboard Shortcuts
 - `Enter` - Send message

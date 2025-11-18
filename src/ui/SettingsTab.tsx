@@ -1,35 +1,47 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type DailyAIAssistantPlugin from '../main';
-import type { PersonalityPreset, DisplayMode } from '../types';
+import type { PersonalityPreset } from '../types';
 
+/**
+ * Settings tab for the Daily AI Assistant plugin.
+ * Provides UI for configuring all plugin settings including:
+ * - LM Studio connection settings
+ * - AI model parameters
+ * - Daily note behavior
+ * - Assistant personality
+ *
+ * @class DailyAIAssistantSettingTab
+ * @extends {PluginSettingTab}
+ */
 export class DailyAIAssistantSettingTab extends PluginSettingTab {
+	/** Reference to the plugin instance */
 	plugin: DailyAIAssistantPlugin;
 
+	/**
+	 * Creates an instance of the settings tab.
+	 *
+	 * @param {App} app - The Obsidian app instance
+	 * @param {DailyAIAssistantPlugin} plugin - The plugin instance
+	 */
 	constructor(app: App, plugin: DailyAIAssistantPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
+	/**
+	 * Renders the settings tab UI.
+	 * Creates all setting controls and binds them to plugin settings.
+	 *
+	 * @returns {void}
+	 */
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
 		containerEl.createEl('h2', { text: 'Daily AI Assistant Settings' });
 
-		// Display mode
-		containerEl.createEl('h3', { text: 'Display Mode' });
-
-		new Setting(containerEl)
-			.setName('Default Mode')
-			.setDesc('Choose between floating popover or pinned sidebar panel')
-			.addDropdown(dropdown => dropdown
-				.addOption('floating', 'Floating Popover')
-				.addOption('sidebar', 'Sidebar Panel')
-				.setValue(this.plugin.settings.defaultMode)
-				.onChange(async (value: DisplayMode) => {
-					this.plugin.settings.defaultMode = value;
-					await this.plugin.saveSettings();
-				}));
+		// Context settings
+		containerEl.createEl('h3', { text: 'Context Settings' });
 
 		new Setting(containerEl)
 			.setName('Include Open Tabs Context')

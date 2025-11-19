@@ -169,7 +169,7 @@ async function processAINode(plugin: DailyAIAssistantPlugin, file: import('obsid
 /**
  * Opens a canvas file in the Flow Canvas view
  */
-async function openCanvasInFlowView(plugin: DailyAIAssistantPlugin, file: import('obsidian').TFile): Promise<void> {
+export async function openCanvasInFlowView(plugin: DailyAIAssistantPlugin, file: import('obsidian').TFile): Promise<void> {
 	try {
 		// Get or create a leaf for the Flow Canvas view
 		const leaf = plugin.app.workspace.getLeaf('tab');

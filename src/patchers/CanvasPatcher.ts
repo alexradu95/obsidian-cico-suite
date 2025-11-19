@@ -9,6 +9,7 @@ import type DailyAIAssistantPlugin from '../main';
 export class CanvasPatcher {
 	private plugin: DailyAIAssistantPlugin;
 	private observer: MutationObserver | null = null;
+	private cardMenuObserver: MutationObserver | null = null;
 
 	constructor(plugin: DailyAIAssistantPlugin) {
 		this.plugin = plugin;
@@ -17,7 +18,7 @@ export class CanvasPatcher {
 	patch(): void {
 		console.log('[AI Canvas] Initializing canvas menu patcher');
 
-		// Watch for menu elements appearing in the DOM
+		// Watch for context menu elements appearing in the DOM
 		this.observer = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
 				for (const node of Array.from(mutation.addedNodes)) {
@@ -32,6 +33,30 @@ export class CanvasPatcher {
 		this.observer.observe(document.body, {
 			childList: true,
 			subtree: false,
+		});
+
+		// Watch for canvas card menu (toolbar) appearing in the DOM
+		this.cardMenuObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				for (const node of Array.from(mutation.addedNodes)) {
+					if (node instanceof HTMLElement) {
+						// Check if this node or its descendants contain canvas-card-menu
+						const cardMenu = node.classList.contains('canvas-card-menu')
+							? node
+							: node.querySelector('.canvas-card-menu');
+
+						if (cardMenu) {
+							this.injectFlowViewButton(cardMenu as HTMLElement);
+						}
+					}
+				}
+			}
+		});
+
+		// Start observing for canvas card menu
+		this.cardMenuObserver.observe(document.body, {
+			childList: true,
+			subtree: true,
 		});
 
 		console.log('[AI Canvas] Canvas menu patcher initialized');
@@ -200,10 +225,106 @@ export class CanvasPatcher {
 		svg.createSvg('path', { attr: { d: pathData } });
 	}
 
+	/**
+	 * Injects a "Switch to Flow View" button into the canvas card menu toolbar
+	 */
+	private injectFlowViewButton(cardMenuEl: HTMLElement): void {
+		// Check if we already injected the button
+		if (cardMenuEl.querySelector('.canvas-flow-view-button')) {
+			return;
+		}
+
+		console.log('[AI Canvas] Injecting Flow View button into canvas card menu');
+
+		// Create button matching the existing canvas-card-menu-button style
+		const flowButton = cardMenuEl.createEl('div', {
+			cls: 'canvas-card-menu-button canvas-flow-view-button',
+			attr: {
+				'aria-label': 'Switch to Flow View',
+				'data-tooltip-position': 'top',
+			},
+		});
+
+		// Create SVG icon matching the style of other buttons
+		const svg = flowButton.createSvg('svg', {
+			attr: {
+				xmlns: 'http://www.w3.org/2000/svg',
+				width: '24',
+				height: '24',
+				viewBox: '0 0 24 24',
+				fill: 'none',
+				stroke: 'currentColor',
+				'stroke-width': '2',
+				'stroke-linecap': 'round',
+				'stroke-linejoin': 'round',
+			},
+		});
+		svg.addClass('svg-icon', 'lucide-git-fork');
+
+		// Add the git-fork icon paths (represents workflow/flow)
+		svg.createSvg('path', {
+			attr: {
+				d: 'M6 3v12',
+			},
+		});
+		svg.createSvg('path', {
+			attr: {
+				d: 'M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+			},
+		});
+		svg.createSvg('path', {
+			attr: {
+				d: 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+			},
+		});
+		svg.createSvg('path', {
+			attr: {
+				d: 'M15 9a9 9 0 0 0-9 9',
+			},
+		});
+
+		// Add click handler to switch to Flow View
+		flowButton.addEventListener('click', async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile || activeFile.extension !== 'canvas') {
+				console.warn('[AI Canvas] No canvas file active');
+				return;
+			}
+
+			console.log('[AI Canvas] Switching to Flow View:', activeFile.path);
+
+			// Import the openCanvasInFlowView function
+			const { openCanvasInFlowView } = await import('../commands/index');
+			await openCanvasInFlowView(this.plugin, activeFile);
+		});
+
+		// Add hover effect
+		flowButton.addEventListener('mouseenter', () => {
+			flowButton.style.backgroundColor = 'var(--background-modifier-hover)';
+		});
+
+		flowButton.addEventListener('mouseleave', () => {
+			flowButton.style.backgroundColor = '';
+		});
+
+		// Insert the button at the end of the menu
+		cardMenuEl.appendChild(flowButton);
+
+		console.log('[AI Canvas] Flow View button injected successfully');
+	}
+
 	destroy(): void {
 		if (this.observer) {
 			this.observer.disconnect();
 			this.observer = null;
+		}
+
+		if (this.cardMenuObserver) {
+			this.cardMenuObserver.disconnect();
+			this.cardMenuObserver = null;
 		}
 	}
 }

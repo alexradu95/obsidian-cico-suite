@@ -9,9 +9,7 @@ import {
 	ReactFlow,
 	ReactFlowProvider,
 	Background,
-	Controls,
 	MiniMap,
-	Panel,
 	useNodesState,
 	useEdgesState,
 	addEdge,
@@ -22,6 +20,8 @@ import {
 	EdgeTypes,
 } from '@xyflow/react';
 import { TextNode } from '../nodes/TextNode';
+import { CanvasControls } from './CanvasControls';
+import { CanvasCardMenu } from './CanvasCardMenu';
 
 /**
  * Props for FlowCanvas component
@@ -193,11 +193,6 @@ function FlowCanvasInternal({
 					size={1}
 				/>
 
-				{/* Controls (zoom, fit view, etc.) */}
-				<Controls
-					showInteractive={!readOnly}
-				/>
-
 				{/* Mini map for navigation */}
 				<MiniMap
 					nodeColor={(node) => {
@@ -209,65 +204,13 @@ function FlowCanvasInternal({
 						backgroundColor: 'var(--background-primary-alt)',
 					}}
 				/>
-
-				{/* Info panel */}
-				<Panel position="top-left">
-					<div
-						style={{
-							padding: '8px 12px',
-							background: 'var(--background-primary-alt)',
-							border: '1px solid var(--background-modifier-border)',
-							borderRadius: '4px',
-							fontSize: '12px',
-							color: 'var(--text-muted)',
-						}}
-					>
-						{nodes.length} nodes, {edges.length} edges
-					</div>
-				</Panel>
-
-				{/* Switch to canvas button */}
-				{onSwitchToCanvas && (
-					<Panel position="top-right">
-						<button
-							onClick={onSwitchToCanvas}
-							style={{
-								padding: '8px 12px',
-								background: 'var(--interactive-normal)',
-								border: '1px solid var(--background-modifier-border)',
-								borderRadius: '4px',
-								fontSize: '12px',
-								color: 'var(--text-normal)',
-								cursor: 'pointer',
-								display: 'flex',
-								alignItems: 'center',
-								gap: '6px',
-							}}
-							onMouseEnter={(e) => {
-								e.currentTarget.style.background = 'var(--interactive-hover)';
-							}}
-							onMouseLeave={(e) => {
-								e.currentTarget.style.background = 'var(--interactive-normal)';
-							}}
-						>
-							<svg
-								width="14"
-								height="14"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
-								<path d="M3 3h18v18H3z" />
-								<path d="M9 9h6v6H9z" />
-							</svg>
-							Switch to Canvas
-						</button>
-					</Panel>
-				)}
 			</ReactFlow>
+
+			{/* Custom canvas controls matching Obsidian's design */}
+			<CanvasControls />
+
+			{/* Custom canvas card menu matching Obsidian's design */}
+			<CanvasCardMenu onSwitchToCanvas={onSwitchToCanvas} />
 		</div>
 	);
 };

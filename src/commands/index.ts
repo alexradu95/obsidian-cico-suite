@@ -1,7 +1,7 @@
 import type DailyAIAssistantPlugin from '../main';
 
 /**
- * Registers all available commands for the Daily AI Assistant plugin.
+ * Registers all available commands for the AI Canvas Workflows plugin.
  * Commands are actions that users can trigger via the Command Palette (Ctrl/Cmd+P)
  * or bind to hotkeys in Obsidian settings.
  *
@@ -12,70 +12,139 @@ import type DailyAIAssistantPlugin from '../main';
  */
 export function registerCommands(plugin: DailyAIAssistantPlugin) {
 	plugin.addCommand({
-		id: 'toggle-ai-assistant',
-		name: 'Toggle AI Assistant',
-		callback: () => toggleAssistant(plugin)
+		id: 'create-agent-canvas',
+		name: 'Create/Open AI Canvas',
+		callback: async () => {
+			await createAgentCanvas(plugin);
+		}
+	});
+
+	plugin.addCommand({
+		id: 'add-default-assistant-to-canvas',
+		name: 'Add Default Assistant to Canvas',
+		checkCallback: (checking: boolean) => {
+			const activeFile = plugin.app.workspace.getActiveFile();
+			if (activeFile && activeFile.extension === 'canvas') {
+				if (!checking) {
+					addDefaultAssistantToCanvas(plugin, activeFile);
+				}
+				return true;
+			}
+			return false;
+		}
+	});
+
+	plugin.addCommand({
+		id: 'process-ai-node',
+		name: 'Process AI Node in Canvas',
+		checkCallback: (checking: boolean) => {
+			const activeFile = plugin.app.workspace.getActiveFile();
+			if (activeFile && activeFile.extension === 'canvas') {
+				if (!checking) {
+					processAINode(plugin, activeFile);
+				}
+				return true;
+			}
+			return false;
+		}
 	});
 }
 
 /**
- * Toggles the visibility of the AI Assistant sidebar panel.
- * Attaches or detaches the sidebar panel based on current state.
+ * Creates or opens an agent canvas file for multi-agent workflows
  *
- * @param {DailyAIAssistantPlugin} plugin - The plugin instance containing the assistant state
- * @see showAssistant - Called when assistant needs to be shown
+ * @param {DailyAIAssistantPlugin} plugin - The plugin instance
  * @example
- * // Usually triggered via command palette or hotkey
- * toggleAssistant(plugin);
+ * // Create a new agent canvas
+ * await createAgentCanvas(plugin);
  */
-export function toggleAssistant(plugin: DailyAIAssistantPlugin) {
-	const leaves = plugin.app.workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT);
-	if (leaves.length > 0) {
-		leaves.forEach(leaf => leaf.detach());
-	} else {
-		showAssistant(plugin);
-	}
-}
+export async function createAgentCanvas(plugin: DailyAIAssistantPlugin): Promise<void> {
+	const { canvasService, settings } = plugin;
 
-/**
- * Shows the AI Assistant in the sidebar.
- * Creates a sidebar panel if none exists.
- *
- * @param {DailyAIAssistantPlugin} plugin - The plugin instance to show the assistant for
- * @example
- * // Show assistant when user triggers a command
- * showAssistant(plugin);
- */
-export async function showAssistant(plugin: DailyAIAssistantPlugin) {
-	const { workspace } = plugin.app;
-	let leaf = workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT)[0];
+	// Generate filename based on current date or use a default
+	const now = new Date();
+	const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+	const canvasPath = `Agent Canvas/agent-canvas-${dateStr}`;
 
-	if (!leaf) {
-		const rightLeaf = workspace.getRightLeaf(false);
-		if (rightLeaf) {
-			await rightLeaf.setViewState({ type: plugin.VIEW_TYPE_AI_ASSISTANT, active: true });
-			leaf = rightLeaf;
+	try {
+		const file = await canvasService.createOrOpenAgentCanvas(canvasPath);
+
+		// Read current canvas data
+		const canvasData = await canvasService.readCanvas(file);
+
+		// If canvas is empty, add default assistant
+		if (canvasData.nodes?.length === 0) {
+			await canvasService.addDefaultAssistant(file);
+
+			// Also add configured agents if any
+			if (settings.agents && settings.agents.length > 0) {
+				for (let i = 0; i < settings.agents.length; i++) {
+					const agent = settings.agents[i];
+					await canvasService.addAgentNode(file, agent, { x: 100, y: 300 + i * 250 });
+				}
+			}
 		}
-	}
 
-	if (leaf) {
-		workspace.revealLeaf(leaf);
+		// Open the canvas
+		await canvasService.openCanvas(file);
+	} catch (error) {
+		console.error('Error creating agent canvas:', error);
 	}
 }
 
 /**
- * Checks if the AI Assistant is currently visible.
- * Returns true if a sidebar leaf is active.
- *
- * @param {DailyAIAssistantPlugin} plugin - The plugin instance to check visibility for
- * @returns {boolean} True if the assistant is visible, false otherwise
- * @example
- * // Check before toggling visibility
- * if (isAssistantVisible(plugin)) {
- *   console.log('Assistant is currently visible');
- * }
+ * Adds the default assistant to the currently active canvas
  */
-export function isAssistantVisible(plugin: DailyAIAssistantPlugin): boolean {
-	const leaves = plugin.app.workspace.getLeavesOfType(plugin.VIEW_TYPE_AI_ASSISTANT);
-	return leaves.length > 0;
+async function addDefaultAssistantToCanvas(plugin: DailyAIAssistantPlugin, file: import('obsidian').TFile): Promise<void> {
+	try {
+		await plugin.canvasService.addDefaultAssistant(file);
+		console.log('Added default assistant to canvas');
+	} catch (error) {
+		console.error('Error adding default assistant:', error);
+	}
+}
+
+/**
+ * Processes an AI node in the currently active canvas
+ */
+async function processAINode(plugin: DailyAIAssistantPlugin, file: import('obsidian').TFile): Promise<void> {
+	const { aiProcessingService, canvasService, app } = plugin;
+
+	try {
+		// Get all nodes from the canvas
+		const canvasData = await canvasService.readCanvas(file);
+
+		// Find AI processing nodes (nodes with "AI Processing Node" in their content)
+		const aiProcessingNodes = canvasData.nodes?.filter(node => {
+			if (node.type !== 'text') return false;
+			const textNode = node as import('../types/jsoncanvas').JSONCanvasTextNode;
+			return textNode.text.includes('**AI Processing Node**');
+		});
+
+		if (!aiProcessingNodes || aiProcessingNodes.length === 0) {
+			app.vault.adapter.write(
+				'temp-notice.txt',
+				'No AI processing nodes found. Create one using the canvas editor.'
+			);
+			return;
+		}
+
+		// If there's only one, process it. Otherwise, ask the user to select
+		if (aiProcessingNodes.length === 1) {
+			await aiProcessingService.processAINode(file, aiProcessingNodes[0].id);
+			console.log('Processed AI node:', aiProcessingNodes[0].id);
+		} else {
+			// For simplicity, process all AI processing nodes
+			for (const node of aiProcessingNodes) {
+				try {
+					await aiProcessingService.processAINode(file, node.id);
+					console.log('Processed AI node:', node.id);
+				} catch (error) {
+					console.error(`Error processing node ${node.id}:`, error);
+				}
+			}
+		}
+	} catch (error) {
+		console.error('Error processing AI nodes:', error);
+	}
 }

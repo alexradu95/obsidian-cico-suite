@@ -1,0 +1,94 @@
+{
+	"nodes": [
+		{
+			"id": "agent-researcher",
+			"type": "text",
+			"text": "# Research Agent\n\n**Role:** researcher\n\n**Perspective:**\nI focus on gathering information, analyzing data, and finding patterns. I would approach the daily journal by:\n- Tracking metrics over time\n- Identifying correlations\n- Suggesting data-driven insights",
+			"x": 0,
+			"y": 0,
+			"width": 350,
+			"height": 200,
+			"color": "5"
+		},
+		{
+			"id": "agent-coach",
+			"type": "text",
+			"text": "# Coaching Agent\n\n**Role:** personal coach\n\n**Perspective:**\nI focus on motivation, goal-setting, and personal growth. I would approach the daily journal by:\n- Celebrating wins\n- Identifying areas for improvement\n- Setting actionable goals\n- Providing encouragement",
+			"x": 0,
+			"y": 250,
+			"width": 350,
+			"height": 200,
+			"color": "1"
+		},
+		{
+			"id": "agent-psychologist",
+			"type": "text",
+			"text": "# Psychology Agent\n\n**Role:** psychologist\n\n**Perspective:**\nI focus on emotions, mental health, and self-awareness. I would approach the daily journal by:\n- Exploring feelings and emotions\n- Understanding triggers\n- Promoting self-reflection\n- Supporting mental wellbeing",
+			"x": 0,
+			"y": 500,
+			"width": 350,
+			"height": 200,
+			"color": "6"
+		},
+		{
+			"id": "ai-synthesizer",
+			"type": "text",
+			"text": "# 🤖 Multi-Perspective Synthesizer\n\n**AI Processing Node**\n\nYou are receiving input from three different agents with different perspectives on helping with daily journaling.\n\nYour task:\n1. Identify the unique value each agent brings\n2. Find complementary aspects between them\n3. Suggest how they could work together\n4. Create a combined approach that leverages all three perspectives\n\nProvide a synthesis that shows how these agents could collaborate to create a comprehensive journaling experience.\n\n---\n\n*Connect input nodes to this node, then connect this node to output nodes*",
+			"x": 400,
+			"y": 150,
+			"width": 450,
+			"height": 350,
+			"color": "6"
+		},
+		{
+			"id": "output-synthesis",
+			"type": "text",
+			"text": "# 📊 Synthesized Multi-Agent Approach\n\n*Waiting for AI processing...*\n\n*This will contain a synthesis of all three agent perspectives*",
+			"x": 900,
+			"y": 200,
+			"width": 450,
+			"height": 400,
+			"color": "3"
+		},
+		{
+			"id": "instructions-multi",
+			"type": "text",
+			"text": "# 🎯 Multi-Agent Brainstorming\n\nThis example shows how to:\n\n**1. Gather Multiple Perspectives**\n   - Three agents (cyan, red, purple)\n   - Each has a different role/perspective\n\n**2. Synthesize Ideas**\n   - Purple processing node\n   - Combines all inputs\n   - Creates unified approach\n\n**3. Generate Insights**\n   - Yellow output node\n   - Shows synthesized result\n\n**To Run:**\n1. Command Palette (Ctrl/Cmd + P)\n2. \"Process AI Node in Canvas\"\n3. View results in yellow node\n\n**Try This:**\n- Add more agent perspectives\n- Change the synthesis instructions\n- Create a second processing step",
+			"x": 900,
+			"y": -250,
+			"width": 450,
+			"height": 400,
+			"color": "2"
+		}
+	],
+	"edges": [
+		{
+			"id": "edge-researcher-to-synth",
+			"fromNode": "agent-researcher",
+			"toNode": "ai-synthesizer",
+			"color": "5",
+			"label": "Data Focus"
+		},
+		{
+			"id": "edge-coach-to-synth",
+			"fromNode": "agent-coach",
+			"toNode": "ai-synthesizer",
+			"color": "1",
+			"label": "Growth Focus"
+		},
+		{
+			"id": "edge-psych-to-synth",
+			"fromNode": "agent-psychologist",
+			"toNode": "ai-synthesizer",
+			"color": "6",
+			"label": "Emotional Focus"
+		},
+		{
+			"id": "edge-synth-to-output",
+			"fromNode": "ai-synthesizer",
+			"toNode": "output-synthesis",
+			"color": "6",
+			"label": "Combined Insights"
+		}
+	]
+}

@@ -1,0 +1,90 @@
+{
+	"nodes": [
+		{
+			"id": "daily-note-raw",
+			"type": "text",
+			"text": "# Daily Note - 2025-11-19\n\n## What I did today\n- Am fost la sală dimineața\n- Am lucrat la proiectul personal 2 ore\n- Am citit 30 pagini dintr-o carte\n\n## How I felt\nM-am simțit bine fizic după sală, dar un pic obosit mental după lucru.\n\n## Notes\nTrebuie să continuu cu consistența la sală.",
+			"x": 0,
+			"y": 0,
+			"width": 400,
+			"height": 300,
+			"color": "4"
+		},
+		{
+			"id": "ai-reflect",
+			"type": "text",
+			"text": "# 🤖 Daily Reflection Generator\n\n**AI Processing Node**\n\nBased on this daily note, provide:\n\n1. **Pattern Recognition**: What patterns do you notice in the activities and feelings?\n\n2. **Thoughtful Questions**: Ask 2-3 reflective questions that could deepen understanding (in Romanian)\n\n3. **Encouragement**: Provide warm, supportive feedback on progress\n\n4. **Suggestions**: Offer 1-2 gentle suggestions for tomorrow\n\nWrite in Romanian, keep it friendly and concise (2-3 sentences per section).\n\n---\n\n*Connect input nodes to this node, then connect this node to output nodes*",
+			"x": 450,
+			"y": 0,
+			"width": 400,
+			"height": 350,
+			"color": "6"
+		},
+		{
+			"id": "output-reflection",
+			"type": "text",
+			"text": "# 💭 AI Reflection\n\n*Waiting for AI processing...*",
+			"x": 900,
+			"y": 0,
+			"width": 450,
+			"height": 400,
+			"color": "3"
+		},
+		{
+			"id": "ai-questions",
+			"type": "text",
+			"text": "# 🤖 Question Generator\n\n**AI Processing Node**\n\nBased on the daily note, generate 3 specific follow-up questions about:\n1. The workout experience (what exercises, how it felt)\n2. The personal project (what specifically was worked on)\n3. The book (what insights or thoughts it sparked)\n\nQuestions should be in Romanian, curious and engaging.\n\n---\n\n*Connect input nodes to this node, then connect this node to output nodes*",
+			"x": 450,
+			"y": 400,
+			"width": 400,
+			"height": 300,
+			"color": "6"
+		},
+		{
+			"id": "output-questions",
+			"type": "text",
+			"text": "# ❓ Follow-up Questions\n\n*Waiting for AI processing...*",
+			"x": 900,
+			"y": 450,
+			"width": 450,
+			"height": 350,
+			"color": "3"
+		},
+		{
+			"id": "example-info",
+			"type": "text",
+			"text": "# 📝 Daily Note Enhancement Example\n\nThis workflow shows how to enhance a daily note with AI:\n\n**Two Parallel Processes:**\n\n1. **Reflection Generator** (top)\n   - Analyzes patterns\n   - Asks deep questions\n   - Provides encouragement\n\n2. **Question Generator** (bottom)\n   - Creates specific follow-ups\n   - Helps expand on brief notes\n\n**Usage:**\n1. Replace the green node with your actual daily note\n2. Run \"Process AI Node in Canvas\"\n3. Get two types of feedback:\n   - Reflective insights (top yellow)\n   - Specific questions (bottom yellow)\n\n**Tip:** Answer the questions and process again for deeper insights!",
+			"x": 0,
+			"y": 350,
+			"width": 400,
+			"height": 450,
+			"color": "5"
+		}
+	],
+	"edges": [
+		{
+			"id": "edge-note-to-reflect",
+			"fromNode": "daily-note-raw",
+			"toNode": "ai-reflect",
+			"color": "4"
+		},
+		{
+			"id": "edge-note-to-questions",
+			"fromNode": "daily-note-raw",
+			"toNode": "ai-questions",
+			"color": "4"
+		},
+		{
+			"id": "edge-reflect-to-output",
+			"fromNode": "ai-reflect",
+			"toNode": "output-reflection",
+			"color": "6"
+		},
+		{
+			"id": "edge-questions-to-output",
+			"fromNode": "ai-questions",
+			"toNode": "output-questions",
+			"color": "6"
+		}
+	]
+}

@@ -1,9 +1,9 @@
 {
 	"id": "daily-ai-assistant",
-	"name": "Daily AI Assistant",
+	"name": "AI Canvas Workflows",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "An AI-powered assistant that proactively engages you with thoughtful questions when opening your daily notes, helping you reflect on your day.",
+	"description": "Create visual AI processing workflows on canvas. Connect nodes, define AI processing steps, and watch information flow through your multi-agent network.",
 	"author": "Your Name",
 	"authorUrl": "https://github.com/yourusername",
 	"isDesktopOnly": false

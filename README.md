@@ -1,16 +1,16 @@
-# Daily AI Assistant for Obsidian
+# AI Canvas Workflows for Obsidian
 
-An AI-powered assistant that proactively engages you with thoughtful questions when opening your daily notes, helping you reflect on your day.
+Create visual AI processing workflows using Obsidian's native canvas. Connect nodes, define processing steps, and watch AI transform your information in real-time.
 
 ## Features
 
-- 🤖 **AI-Powered Reflections**: Get personalized questions and insights based on your daily notes
-- 📝 **Daily Note Integration**: Automatically activates when you open daily notes
-- 💬 **Interactive Chat**: Have natural conversations with the AI about your day
-- 🎨 **Multiple Personalities**: Choose from concise, balanced, reflective, or poetic response styles
-- 📌 **Sidebar Integration**: Clean integration as a sidebar panel in your workspace
-- 🎯 **Context-Aware**: Analyzes previous daily notes and open tabs for better insights
-- 🌐 **Mobile Compatible**: Works on both desktop and mobile devices
+- 🎨 **Visual Workflows**: Design AI processing flows on canvas with drag-and-drop nodes
+- 🔀 **Multi-Agent Processing**: Combine multiple AI perspectives in a single workflow
+- 🤖 **Flexible AI Processing**: Define custom instructions for any transformation
+- 📊 **Real-Time Results**: See AI-processed output update directly on canvas
+- 🔗 **Node-Based Architecture**: Connect inputs, processors, and outputs visually
+- 🌐 **JSON Canvas Format**: Uses Obsidian's standard canvas format
+- 🔐 **Privacy-First**: All processing happens locally via LM Studio
 
 ## Privacy & Network Usage
 
@@ -18,14 +18,14 @@ An AI-powered assistant that proactively engages you with thoughtful questions w
 
 ### Network Calls
 - **Destination**: Configurable LM Studio URL (default: `http://localhost:1234/v1`)
-- **Data Sent**: Your daily note content, previous notes summaries, and chat messages
-- **Purpose**: To generate AI-powered reflections and responses
-- **Default Behavior**: Network calls only happen when you explicitly use the "Analyze" feature or send a chat message
+- **Data Sent**: Canvas node contents and processing instructions
+- **Purpose**: To generate AI-powered responses
+- **Default Behavior**: Network calls only when you explicitly run "Process AI Node in Canvas"
 
 ### Privacy Considerations
 - All data is sent to **your local LM Studio instance** by default
 - No data is sent to external services unless you configure a remote LM Studio URL
-- Your vault contents are only processed when you explicitly request analysis
+- Canvas contents are only processed when you explicitly trigger processing
 - No telemetry or analytics are collected
 
 ### Required Setup
@@ -39,50 +39,137 @@ An AI-powered assistant that proactively engages you with thoughtful questions w
 ### From Obsidian Community Plugins (Coming Soon)
 1. Open Obsidian Settings
 2. Navigate to **Community plugins**
-3. Search for "Daily AI Assistant"
+3. Search for "AI Canvas Workflows"
 4. Click **Install**
 5. Enable the plugin
 
 ### Manual Installation
 1. Download the latest release from GitHub
-2. Extract the files to `<vault>/.obsidian/plugins/daily-ai-assistant/`
+2. Extract the files to `<vault>/.obsidian/plugins/ai-canvas-workflows/`
 3. Reload Obsidian
 4. Enable the plugin in **Settings → Community plugins**
+
+## Quick Start
+
+### 1. Set Up LM Studio
+1. Install and run [LM Studio](https://lmstudio.ai/)
+2. Load a model
+3. Start the server (default port: 1234)
+4. Go to plugin settings and verify the LM Studio URL
+
+### 2. Try an Example
+1. Copy an example from the `examples/` folder to your vault
+2. Open it in Obsidian
+3. Press `Ctrl/Cmd + P` → "Process AI Node in Canvas"
+4. Watch the AI process the workflow!
+
+### 3. Create Your Own
+1. Create a new canvas
+2. Add nodes:
+   - **Input node** (any text node) - your data
+   - **AI Processing node** (purple) - what to do
+   - **Output node** (yellow) - results
+3. Connect them with arrows
+4. Run "Process AI Node in Canvas"
+
+## Usage
+
+### Basic Workflow Pattern
+
+\`\`\`
+[Input Node] → [AI Processing Node] → [Output Node]
+\`\`\`
+
+### Creating an AI Processing Node
+
+Add a text node with this format:
+
+\`\`\`
+# 🤖 [Title]
+
+**AI Processing Node**
+
+[Your instructions for the AI]
+
+---
+\`\`\`
+
+**Example:**
+\`\`\`
+# 🤖 Summarizer
+
+**AI Processing Node**
+
+Summarize the input in 3 bullet points.
+Focus on key insights and actionable items.
+
+---
+\`\`\`
+
+### Running a Workflow
+
+1. Connect nodes: Input → Processing → Output
+2. Open Command Palette (\`Ctrl/Cmd + P\`)
+3. Type "Process AI"
+4. Select "Process AI Node in Canvas"
+5. Results appear in output nodes!
+
+### Commands
+
+- **Create/Open AI Canvas**: Create a new canvas with default assistant
+- **Add Default Assistant to Canvas**: Add the Romanian assistant node (when canvas is open)
+- **Process AI Node in Canvas**: Process all AI workflows in active canvas
+
+### Advanced Patterns
+
+#### Multiple Inputs
+Combine information from multiple sources:
+\`\`\`
+[Input 1] ─┐
+[Input 2] ─┼→ [Processing] → [Output]
+[Input 3] ─┘
+\`\`\`
+
+#### Multiple Outputs
+Generate different views of the same data:
+\`\`\`
+               ┌→ [Summary]
+[Input] → [Processing] ─┤
+               └→ [Questions]
+\`\`\`
+
+#### Chained Processing
+Process data in multiple steps:
+\`\`\`
+[Input] → [Step 1] → [Step 2] → [Final Output]
+\`\`\`
+
+#### Parallel Processing
+Apply different processors to the same input:
+\`\`\`
+               ┌→ [Analyze] → [Analysis Output]
+[Input] ───────┤
+               └→ [Translate] → [Translation Output]
+\`\`\`
+
+## Examples
+
+The \`examples/\` folder contains ready-to-use workflows:
+
+- **\`hello-world.canvas\`** ⭐ - Simplest workflow (start here!)
+- **\`example-ai-workflow.canvas\`** - Agent analysis
+- **\`multi-agent-brainstorm.canvas\`** - Multi-perspective synthesis
+- **\`daily-note-enhancement.canvas\`** - Daily note reflection
+
+See [examples/QUICKSTART.md](examples/QUICKSTART.md) for a detailed tutorial.
 
 ## Configuration
 
 ### LM Studio Connection
-- **LM Studio URL**: The URL where your LM Studio server is running (default: `http://localhost:1234/v1`)
+- **LM Studio URL**: The URL where your LM Studio server is running (default: \`http://localhost:1234/v1\`)
 - **Model Name**: Optional model identifier (leave empty for auto-detection)
-
-### Assistant Behavior
-- **Auto-show on daily note**: Automatically display the assistant when opening a daily note
-- **Assistant Personality**: Choose how the assistant responds:
-  - **Concis** - Short and direct (1-2 sentences)
-  - **Echilibrat** - Friendly and thoughtful (2-3 sentences)
-  - **Reflectiv** - Deep insights and meaningful questions (3-4 sentences)
-  - **Poetic** - Creative and expressive with metaphors
-- **Include Open Tabs Context**: Include content from your open tabs in analysis
-
-### Conversation Settings
-- **Days of context**: Number of previous daily notes to consider (1-14)
-- **Max response tokens**: Maximum length of AI responses (50-500)
+- **Max Response Tokens**: Maximum length of AI responses (50-500)
 - **Temperature**: Controls creativity of responses (0.0-1.0)
-
-## Usage
-
-### Basic Usage
-1. Open a daily note (format: `YYYY-MM-DD.md`)
-2. The AI Assistant will automatically appear (if enabled in settings)
-3. The assistant automatically loads context from your notes and provides insights
-4. Type a question or message to have a conversation
-
-### Commands
-- **Toggle AI Assistant**: Show/hide the assistant sidebar
-
-### Keyboard Shortcuts
-- `Enter` - Send message
-- `Shift + Enter` - New line in message
 
 ## Development
 
@@ -92,7 +179,7 @@ An AI-powered assistant that proactively engages you with thoughtful questions w
 - LM Studio with a loaded language model
 
 ### Setup
-```bash
+\`\`\`bash
 # Install dependencies
 npm install
 
@@ -101,22 +188,26 @@ npm run dev
 
 # Build for production
 npm run build
-```
+
+# Run tests
+npm test
+\`\`\`
 
 ### Project Structure
-```
+\`\`\`
 src/
 ├── main.tsx              # Plugin entry point
 ├── types/                # TypeScript type definitions
-├── services/             # Business logic (AI service)
+│   └── jsoncanvas.ts     # JSON Canvas format types
+├── services/             # Business logic
+│   ├── AIService.ts      # LM Studio API integration
+│   ├── CanvasService.ts  # Canvas file operations
+│   └── AIProcessingService.ts  # AI workflow processing
 ├── commands/             # Command implementations
-├── context/              # React Context
-├── hooks/                # Custom React hooks
-├── components/           # React UI components
 └── ui/
-    ├── views/            # Obsidian view wrappers
     └── SettingsTab.tsx   # Settings interface
-```
+examples/                 # Example canvas workflows
+\`\`\`
 
 ## Contributing
 
@@ -129,14 +220,15 @@ MIT License - see LICENSE file for details
 ## Support
 
 If you encounter any issues or have questions:
-1. Check the [GitHub Issues](https://github.com/yourusername/daily-ai-assistant/issues)
-2. Create a new issue with details about your problem
-3. Include your Obsidian version and plugin version
+1. Check the [examples/](examples/) folder for working examples
+2. Review the [examples/QUICKSTART.md](examples/QUICKSTART.md) tutorial
+3. Check the [GitHub Issues](https://github.com/yourusername/ai-canvas-workflows/issues)
+4. Create a new issue with details about your problem
 
 ## Acknowledgments
 
 - Built with [Obsidian Plugin API](https://github.com/obsidianmd/obsidian-api)
-- Uses [React](https://react.dev/) for UI components
+- Uses [JSON Canvas](https://jsoncanvas.org/) open format
 - Integrates with [LM Studio](https://lmstudio.ai/) for local AI processing
 
 ---

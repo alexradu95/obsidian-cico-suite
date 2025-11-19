@@ -1,0 +1,60 @@
+{
+	"nodes": [
+		{
+			"id": "input-simple",
+			"type": "text",
+			"text": "# My Input\n\nHello! This is a simple test message.\n\nI want to learn how AI canvas workflows work in this plugin.",
+			"x": 50,
+			"y": 100,
+			"width": 350,
+			"height": 200,
+			"color": "4"
+		},
+		{
+			"id": "ai-simple",
+			"type": "text",
+			"text": "# 🤖 Simple Processor\n\n**AI Processing Node**\n\nRead the input message and respond with:\n1. A friendly greeting\n2. A brief explanation of how this workflow works\n3. An encouraging message\n\nKeep it simple and friendly!\n\n---\n\n*Connect input nodes to this node, then connect this node to output nodes*",
+			"x": 450,
+			"y": 100,
+			"width": 350,
+			"height": 300,
+			"color": "6"
+		},
+		{
+			"id": "output-simple",
+			"type": "text",
+			"text": "# AI Response\n\n*Waiting for AI processing...*\n\n---\n\n**How to run:**\n1. Ctrl/Cmd + P\n2. Type: Process AI\n3. Select: Process AI Node in Canvas\n4. Watch this node update!",
+			"x": 850,
+			"y": 100,
+			"width": 400,
+			"height": 300,
+			"color": "3"
+		},
+		{
+			"id": "instructions-hello",
+			"type": "text",
+			"text": "# 👋 Hello World Canvas\n\n**This is the simplest possible workflow!**\n\n**3 Nodes:**\n- 🟢 Input (your message)\n- 🟣 Processor (what to do)\n- 🟡 Output (AI result)\n\n**2 Connections:**\n- Input → Processor\n- Processor → Output\n\n**1 Command:**\n- \"Process AI Node in Canvas\"\n\n---\n\n**Try it:**\n1. Edit the green input node\n2. Edit the purple instructions\n3. Run the command\n4. See results in yellow!\n\nThat's all there is to it! 🎉",
+			"x": 450,
+			"y": 450,
+			"width": 400,
+			"height": 400,
+			"color": "5"
+		}
+	],
+	"edges": [
+		{
+			"id": "edge1",
+			"fromNode": "input-simple",
+			"toNode": "ai-simple",
+			"color": "4",
+			"label": "Your Message"
+		},
+		{
+			"id": "edge2",
+			"fromNode": "ai-simple",
+			"toNode": "output-simple",
+			"color": "6",
+			"label": "AI Response"
+		}
+	]
+}

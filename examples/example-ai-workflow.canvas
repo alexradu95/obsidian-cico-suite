@@ -1,0 +1,60 @@
+{
+	"nodes": [
+		{
+			"id": "input-agent-description",
+			"type": "text",
+			"text": "# Default Assistant\n\n**Role:** general\n\n**System Prompt:**\nEști un asistent de jurnal prietenos și gânditor. Vorbește în limba română.\nOferă observații sau întrebări concise (2-3 propoziții). Fii cald dar nu prea verbos.\nConcentrează-te pe: sport/sală (ce ai făcut, cum te-ai simțit), dezvoltare personală (ce ai învățat/lucrat azi),\nrelaxare (cum te destresezi), și pattern-uri între ziua curentă și zilele anterioare.",
+			"x": 0,
+			"y": 0,
+			"width": 400,
+			"height": 280,
+			"color": "4"
+		},
+		{
+			"id": "ai-processor-analyze",
+			"type": "text",
+			"text": "# 🤖 Agent Analyzer\n\n**AI Processing Node**\n\nAnalyze this agent's role and system prompt. Provide:\n1. A summary of the agent's purpose\n2. Key characteristics of its personality\n3. What kind of questions it would ask\n4. Suggestions for improvement\n\n---\n\n*Connect input nodes to this node, then connect this node to output nodes*",
+			"x": 450,
+			"y": 0,
+			"width": 400,
+			"height": 280,
+			"color": "6"
+		},
+		{
+			"id": "output-analysis",
+			"type": "text",
+			"text": "# Analysis Results\n\n*Waiting for AI processing...*\n\n*To process: Open Command Palette and run \"Process AI Node in Canvas\"*",
+			"x": 900,
+			"y": 0,
+			"width": 450,
+			"height": 400,
+			"color": "3"
+		},
+		{
+			"id": "instructions",
+			"type": "text",
+			"text": "# 📋 How to Use This Workflow\n\n**Steps:**\n\n1. **Review the Input** (green node on left)\n   - Contains an agent description\n\n2. **Check the AI Processor** (purple node in middle)\n   - Defines what to do with the input\n   - You can edit the instructions\n\n3. **Process the Workflow**\n   - Open Command Palette (Ctrl/Cmd + P)\n   - Run: \"Process AI Node in Canvas\"\n   - The AI will process the input and update the yellow output node\n\n4. **View Results** (yellow node on right)\n   - Will show AI-generated analysis\n\n**Try it yourself:**\n- Edit the agent description\n- Modify the processing instructions\n- Run the command again to see new results!",
+			"x": 0,
+			"y": 330,
+			"width": 500,
+			"height": 400,
+			"color": "5"
+		}
+	],
+	"edges": [
+		{
+			"id": "edge-input-to-processor",
+			"fromNode": "input-agent-description",
+			"toNode": "ai-processor-analyze",
+			"color": "4",
+			"label": "Agent Info"
+		},
+		{
+			"id": "edge-processor-to-output",
+			"fromNode": "ai-processor-analyze",
+			"toNode": "output-analysis",
+			"color": "6",
+			"label": "AI Results"
+		}
+	]
+}

@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import { Plugin, TFile } from 'obsidian';
 import { DEFAULT_SETTINGS, type DailyAIAssistantSettings } from './types';
 import { AIService } from './services/AIService';
 import { CanvasService } from './services/CanvasService';
@@ -48,8 +48,68 @@ export default class DailyAIAssistantPlugin extends Plugin {
 		// Register canvas commands
 		registerCommands(this);
 
+		// Register context menu for canvas files
+		this.registerEvent(
+			this.app.workspace.on('file-menu', (menu, file) => {
+				// Check if it's a TFile and has .canvas extension
+				if (file instanceof TFile && file.extension === 'canvas') {
+					menu.addItem((item) => {
+						item
+							.setTitle('Add AI Agent Here')
+							.setIcon('bot')
+							.onClick(async () => {
+								await this.canvasService.addDefaultAssistant(file, this.getCanvasCursorPosition());
+							});
+					});
+
+					menu.addItem((item) => {
+						item
+							.setTitle('Add AI Processing Node')
+							.setIcon('wand')
+							.onClick(async () => {
+								const nodeId = `ai-processor-${Date.now()}`;
+								await this.canvasService.addAIProcessingNode(
+									file,
+									nodeId,
+									'New Processor',
+									'Describe what you want this AI to do with the input.',
+									this.getCanvasCursorPosition()
+								);
+							});
+					});
+
+					menu.addItem((item) => {
+						item
+							.setTitle('Add Output Node')
+							.setIcon('file-output')
+							.onClick(async () => {
+								const nodeId = `output-${Date.now()}`;
+								await this.canvasService.addOutputNode(
+									file,
+									nodeId,
+									'Output',
+									this.getCanvasCursorPosition()
+								);
+							});
+					});
+				}
+			})
+		);
+
 		// Add settings tab
 		this.addSettingTab(new DailyAIAssistantSettingTab(this.app, this));
+	}
+
+	/**
+	 * Gets the current cursor position on the canvas
+	 * Returns a default position if cursor position cannot be determined
+	 */
+	private getCanvasCursorPosition(): { x: number; y: number } {
+		// Default position - will be used if we can't get the actual cursor position
+		return {
+			x: 100 + Math.random() * 200,
+			y: 100 + Math.random() * 200
+		};
 	}
 
 	/**

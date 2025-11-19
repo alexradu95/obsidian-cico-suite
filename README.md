@@ -119,6 +119,7 @@ Focus on key insights and actionable items.
 - **Create/Open AI Canvas**: Create a new canvas with default assistant
 - **Add Default Assistant to Canvas**: Add the Romanian assistant node (when canvas is open)
 - **Process AI Node in Canvas**: Process all AI workflows in active canvas
+### Context Menu (Right-Click)When you right-click on a canvas file in the file explorer, you get quick access to:- **Add AI Agent Here**: Adds the default Romanian assistant- **Add AI Processing Node**: Adds a purple processing node- **Add Output Node**: Adds a yellow output nodeAll nodes are added at a random position on the canvas.
 
 ### Advanced Patterns
 

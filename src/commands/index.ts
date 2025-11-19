@@ -1,4 +1,6 @@
 import type DailyAIAssistantPlugin from '../main';
+import { FLOW_CANVAS_VIEW_TYPE } from '../views/FlowCanvasView';
+import type { FlowCanvasView } from '../views/FlowCanvasView';
 
 /**
  * Registers all available commands for the AI Canvas Workflows plugin.
@@ -42,6 +44,21 @@ export function registerCommands(plugin: DailyAIAssistantPlugin) {
 			if (activeFile && activeFile.extension === 'canvas') {
 				if (!checking) {
 					processAINode(plugin, activeFile);
+				}
+				return true;
+			}
+			return false;
+		}
+	});
+
+	plugin.addCommand({
+		id: 'open-canvas-in-flow-view',
+		name: 'Open Canvas in Flow View',
+		checkCallback: (checking: boolean) => {
+			const activeFile = plugin.app.workspace.getActiveFile();
+			if (activeFile && activeFile.extension === 'canvas') {
+				if (!checking) {
+					openCanvasInFlowView(plugin, activeFile);
 				}
 				return true;
 			}
@@ -146,5 +163,32 @@ async function processAINode(plugin: DailyAIAssistantPlugin, file: import('obsid
 		}
 	} catch (error) {
 		console.error('Error processing AI nodes:', error);
+	}
+}
+
+/**
+ * Opens a canvas file in the Flow Canvas view
+ */
+async function openCanvasInFlowView(plugin: DailyAIAssistantPlugin, file: import('obsidian').TFile): Promise<void> {
+	try {
+		// Get or create a leaf for the Flow Canvas view
+		const leaf = plugin.app.workspace.getLeaf('tab');
+
+		// Set the view type to Flow Canvas
+		await leaf.setViewState({
+			type: FLOW_CANVAS_VIEW_TYPE,
+			active: true,
+		});
+
+		// Get the view and load the canvas file
+		const view = leaf.view;
+		if (view && view.getViewType() === FLOW_CANVAS_VIEW_TYPE) {
+			await (view as FlowCanvasView).loadCanvas(file);
+		}
+
+		// Reveal the leaf
+		plugin.app.workspace.revealLeaf(leaf);
+	} catch (error) {
+		console.error('Error opening canvas in Flow view:', error);
 	}
 }

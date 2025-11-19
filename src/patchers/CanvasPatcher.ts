@@ -20,7 +20,7 @@ export class CanvasPatcher {
 		// Watch for menu elements appearing in the DOM
 		this.observer = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
-				for (const node of mutation.addedNodes) {
+				for (const node of Array.from(mutation.addedNodes)) {
 					if (node instanceof HTMLElement && node.classList.contains('menu')) {
 						this.handleMenuAppeared(node);
 					}

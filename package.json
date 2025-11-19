@@ -36,6 +36,8 @@
 		"vitest": "^4.0.10"
 	},
 	"dependencies": {
+		"@xyflow/react": "^12.9.3",
+		"dagre": "^0.8.5",
 		"monkey-around": "^3.0.0",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0"

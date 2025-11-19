@@ -1,4 +1,4 @@
-import { Plugin, TFile } from 'obsidian';
+import { Plugin, TFile, WorkspaceLeaf } from 'obsidian';
 import { DEFAULT_SETTINGS, type DailyAIAssistantSettings } from './types';
 import { AIService } from './services/AIService';
 import { CanvasService } from './services/CanvasService';
@@ -6,6 +6,8 @@ import { AIProcessingService } from './services/AIProcessingService';
 import { DailyAIAssistantSettingTab } from './ui/SettingsTab';
 import { registerCommands } from './commands';
 import { CanvasPatcher } from './patchers/CanvasPatcher';
+import { FlowCanvasView, FLOW_CANVAS_VIEW_TYPE, CANVAS_FILE_EXTENSION } from './views/FlowCanvasView';
+import '@xyflow/react/dist/style.css';
 
 /**
  * Main plugin class for AI Canvas Workflows.
@@ -41,6 +43,16 @@ export default class DailyAIAssistantPlugin extends Plugin {
 		this.aiService = new AIService(this.app, this.settings);
 		this.canvasService = new CanvasService(this.app);
 		this.aiProcessingService = new AIProcessingService(this.canvasService, this.aiService);
+
+		// Register Flow Canvas view
+		this.registerView(
+			FLOW_CANVAS_VIEW_TYPE,
+			(leaf) => new FlowCanvasView(leaf, this)
+		);
+
+		// Note: We don't register the .canvas extension because Obsidian's built-in
+		// canvas already owns it. Instead, we provide commands to open canvas files
+		// in our Flow Canvas view.
 
 		// Initialize canvas patcher for context menus
 		this.canvasPatcher = new CanvasPatcher(this);
@@ -112,6 +124,9 @@ export default class DailyAIAssistantPlugin extends Plugin {
 		if (this.canvasPatcher) {
 			this.canvasPatcher.destroy();
 		}
+
+		// Detach all flow canvas views
+		this.app.workspace.detachLeavesOfType(FLOW_CANVAS_VIEW_TYPE);
 	}
 
 	/**

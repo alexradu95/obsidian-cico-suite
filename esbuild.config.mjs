@@ -41,7 +41,8 @@ const context = await esbuild.context({
 	minify: prod,
 	loader: {
 		'.tsx': 'tsx',
-		'.ts': 'ts'
+		'.ts': 'ts',
+		'.css': 'css'
 	},
 });
 

@@ -89,7 +89,7 @@ export class CanvasService {
 		const agentNode: JSONCanvasTextNode = {
 			id: agent.id,
 			type: 'text',
-			text: `# ${agent.name}\n\n**Role:** ${agent.role}\n\n**System Prompt:**\n${agent.systemPrompt}`,
+			text: `# 🤖 AI Agent\n\n> **${agent.name}**\n\n**Role:** ${agent.role}\n\n**System Prompt:**\n${agent.systemPrompt}`,
 			x: position?.x ?? 100 + (data.nodes?.length ?? 0) * 250,
 			y: position?.y ?? 100,
 			width: 300,
@@ -118,7 +118,7 @@ export class CanvasService {
 		const updatedNode: JSONCanvasTextNode = {
 			...existingNode as JSONCanvasTextNode,
 			type: 'text',
-			text: `# ${agent.name}\n\n**Role:** ${agent.role}\n\n**System Prompt:**\n${agent.systemPrompt}`,
+			text: `# 🤖 AI Agent\n\n> **${agent.name}**\n\n**Role:** ${agent.role}\n\n**System Prompt:**\n${agent.systemPrompt}`,
 			color: this.getAgentColor(agent.role)
 		};
 
@@ -163,7 +163,7 @@ export class CanvasService {
 		const defaultAssistant: JSONCanvasTextNode = {
 			id: 'default-assistant',
 			type: 'text',
-			text: `# Default Assistant\n\n**Role:** general\n\n**System Prompt:**\nEști un asistent de jurnal prietenos și gânditor. Vorbește în limba română.\nOferă observații sau întrebări concise (2-3 propoziții). Fii cald dar nu prea verbos.\nConcentrează-te pe: sport/sală (ce ai făcut, cum te-ai simțit), dezvoltare personală (ce ai învățat/lucrat azi),\nrelaxare (cum te destresezi), și pattern-uri între ziua curentă și zilele anterioare.`,
+			text: `# 🤖 AI Agent\n\n> **Default Assistant**\n\n**Role:** general\n\n**System Prompt:**\nEști un asistent de jurnal prietenos și gânditor. Vorbește în limba română.\nOferă observații sau întrebări concise (2-3 propoziții). Fii cald dar nu prea verbos.\nConcentrează-te pe: sport/sală (ce ai făcut, cum te-ai simțit), dezvoltare personală (ce ai învățat/lucrat azi),\nrelaxare (cum te destresezi), și pattern-uri între ziua curentă și zilele anterioare.`,
 			x: position?.x ?? 100,
 			y: position?.y ?? 100,
 			width: 400,
@@ -202,7 +202,7 @@ export class CanvasService {
 		const processingNode: JSONCanvasTextNode = {
 			id: nodeId,
 			type: 'text',
-			text: `# 🤖 ${title}\n\n**AI Processing Node**\n\n${instruction}\n\n---\n\n*Connect input nodes to this node, then connect this node to output nodes*`,
+			text: `# ⚙️ AI Processor\n\n> **${title}**\n\n**Instructions:**\n${instruction}\n\n---\n\n*Connect input nodes → this node → output nodes*`,
 			x: position?.x ?? 300,
 			y: position?.y ?? 100,
 			width: 350,
@@ -228,7 +228,7 @@ export class CanvasService {
 		const outputNode: JSONCanvasTextNode = {
 			id: nodeId,
 			type: 'text',
-			text: `# ${title}\n\n*Waiting for AI processing...*`,
+			text: `# 📤 Output\n\n> **${title}**\n\n*Waiting for AI processing...*\n\n---\n\n*Results will appear here after processing*`,
 			x: position?.x ?? 600,
 			y: position?.y ?? 100,
 			width: 350,

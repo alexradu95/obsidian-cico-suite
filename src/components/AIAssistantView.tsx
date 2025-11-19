@@ -484,9 +484,12 @@ export const AIAssistantView = ({ onClear }: AIAssistantViewProps) => {
 
 			<div className="ai-input-container">
 				{/* Context Frame Controls - Only show when viewing a daily note */}
-				{contextFiles.some(f => f.isCurrentTab) &&
-				 app.workspace.getActiveFile() &&
-				 aiService.isDailyNote(app.workspace.getActiveFile()) && (
+				{(() => {
+					const activeFile = app.workspace.getActiveFile();
+					return contextFiles.some(f => f.isCurrentTab) &&
+					 activeFile &&
+					 aiService.isDailyNote(activeFile);
+				})() && (
 					<div className="ai-context-frame">
 						<div className="ai-context-frame-header">
 							<span>📅 Context Frame</span>

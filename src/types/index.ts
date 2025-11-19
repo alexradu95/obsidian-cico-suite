@@ -26,6 +26,14 @@ export interface Message {
 export type PersonalityPreset = 'concise' | 'balanced' | 'reflective' | 'poetic';
 
 /**
+ * Operating mode for the AI assistant - single agent or multi-agent
+ */
+export enum AgentMode {
+	SINGLE = 'single',
+	MULTI = 'multi'
+}
+
+/**
  * Configuration settings for the Daily AI Assistant plugin.
  * These settings are persisted and can be modified through the settings tab.
  *
@@ -52,6 +60,12 @@ export interface DailyAIAssistantSettings {
 	personality: PersonalityPreset;
 	/** Whether to include context from all open tabs in the workspace */
 	includeOpenTabs: boolean;
+	/** Operating mode - single or multi agent */
+	agentMode: AgentMode;
+	/** Array of configured agents (only for multi-agent mode) */
+	agents?: import('./agent').Agent[];
+	/** ID of the currently active agent */
+	activeAgentId?: string;
 }
 
 /**
@@ -70,7 +84,8 @@ export const DEFAULT_SETTINGS: DailyAIAssistantSettings = {
 	maxTokens: 150,
 	temperature: 0.7,
 	personality: 'concise',
-	includeOpenTabs: true
+	includeOpenTabs: true,
+	agentMode: AgentMode.SINGLE
 };
 
 /**

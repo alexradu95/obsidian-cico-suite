@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type DailyAIAssistantPlugin from '../main';
 import type { PersonalityPreset } from '../types';
+import { AgentMode } from '../types';
 
 /**
  * Settings tab for the Daily AI Assistant plugin.
@@ -62,6 +63,21 @@ export class DailyAIAssistantSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.modelName)
 				.onChange(async (value) => {
 					this.plugin.settings.modelName = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Multi-Agent Mode
+		containerEl.createEl('h3', { text: 'Multi-Agent Mode' });
+
+		new Setting(containerEl)
+			.setName('Agent Mode')
+			.setDesc('Enable multi-agent mode for managing multiple AI assistants')
+			.addDropdown(dropdown => dropdown
+				.addOption(AgentMode.SINGLE, 'Single Agent - Traditional mode')
+				.addOption(AgentMode.MULTI, 'Multi-Agent - Network mode')
+				.setValue(this.plugin.settings.agentMode)
+				.onChange(async (value: AgentMode) => {
+					this.plugin.settings.agentMode = value;
 					await this.plugin.saveSettings();
 				}));
 

@@ -1,6 +1,7 @@
 import { Plugin, TFile } from 'obsidian';
-import { DEFAULT_SETTINGS, VIEW_TYPE_AI_ASSISTANT, type DailyAIAssistantSettings } from './types';
+import { DEFAULT_SETTINGS, VIEW_TYPE_AI_ASSISTANT, type DailyAIAssistantSettings, AgentMode } from './types';
 import { AIService } from './services/AIService';
+import { AgentService } from './services/AgentService';
 import { DailyAIAssistantSettingTab } from './ui/SettingsTab';
 import { AIAssistantSidebarView } from './ui/views/SidebarView';
 import { registerCommands, showAssistant, isAssistantVisible } from './commands';
@@ -21,6 +22,8 @@ export default class DailyAIAssistantPlugin extends Plugin {
 	settings: DailyAIAssistantSettings;
 	/** Service instance for handling AI interactions and LM Studio API calls */
 	aiService: AIService;
+	/** Service instance for managing multi-agent interactions */
+	agentService: AgentService;
 	/** Reference to the sidebar view instance */
 	sidebarView: AIAssistantSidebarView | null = null;
 	/** View type identifier for registering the sidebar view with Obsidian */
@@ -37,6 +40,7 @@ export default class DailyAIAssistantPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.aiService = new AIService(this.app, this.settings);
+		this.agentService = new AgentService(this.aiService);
 
 		// Register sidebar view
 		this.registerView(

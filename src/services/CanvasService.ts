@@ -55,6 +55,11 @@ export class CanvasService {
 	async readCanvas(file: TFile): Promise<JSONCanvasData> {
 		const content = await this.app.vault.read(file);
 
+		// Handle empty files
+		if (!content || content.trim() === '') {
+			return { nodes: [], edges: [] };
+		}
+
 		try {
 			const data = JSON.parse(content) as JSONCanvasData;
 			return {
@@ -62,7 +67,7 @@ export class CanvasService {
 				edges: data.edges || []
 			};
 		} catch (error) {
-			console.error('Error parsing canvas file:', error);
+			console.warn('Canvas file is empty or invalid, starting with empty canvas');
 			return { nodes: [], edges: [] };
 		}
 	}

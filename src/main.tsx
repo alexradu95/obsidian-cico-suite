@@ -5,6 +5,7 @@ import { CanvasService } from './services/CanvasService';
 import { AIProcessingService } from './services/AIProcessingService';
 import { DailyAIAssistantSettingTab } from './ui/SettingsTab';
 import { registerCommands } from './commands';
+import { CanvasPatcher } from './patchers/CanvasPatcher';
 
 /**
  * Main plugin class for AI Canvas Workflows.
@@ -25,6 +26,8 @@ export default class DailyAIAssistantPlugin extends Plugin {
 	canvasService: CanvasService;
 	/** Service instance for AI processing workflows on canvas */
 	aiProcessingService: AIProcessingService;
+	/** Patcher for adding canvas context menu support */
+	canvasPatcher: CanvasPatcher;
 
 	/**
 	 * Called when the plugin is loaded by Obsidian.
@@ -39,6 +42,10 @@ export default class DailyAIAssistantPlugin extends Plugin {
 		this.canvasService = new CanvasService(this.app);
 		this.aiProcessingService = new AIProcessingService(this.canvasService, this.aiService);
 
+		// Initialize canvas patcher for context menus
+		this.canvasPatcher = new CanvasPatcher(this);
+		this.canvasPatcher.patch();
+
 		// Add ribbon icon for canvas
 		this.addRibbonIcon('git-fork', 'Create/Open AI Canvas', async () => {
 			const commands = require('./commands');
@@ -48,7 +55,7 @@ export default class DailyAIAssistantPlugin extends Plugin {
 		// Register canvas commands
 		registerCommands(this);
 
-		// Register context menu for canvas files
+		// Register context menu for canvas files in file explorer
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {
 				// Check if it's a TFile and has .canvas extension
@@ -98,6 +105,13 @@ export default class DailyAIAssistantPlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new DailyAIAssistantSettingTab(this.app, this));
+	}
+
+	onunload(): void {
+		// Clean up canvas patcher
+		if (this.canvasPatcher) {
+			this.canvasPatcher.destroy();
+		}
 	}
 
 	/**

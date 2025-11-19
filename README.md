@@ -119,7 +119,37 @@ Focus on key insights and actionable items.
 - **Create/Open AI Canvas**: Create a new canvas with default assistant
 - **Add Default Assistant to Canvas**: Add the Romanian assistant node (when canvas is open)
 - **Process AI Node in Canvas**: Process all AI workflows in active canvas
-### Context Menu (Right-Click)When you right-click on a canvas file in the file explorer, you get quick access to:- **Add AI Agent Here**: Adds the default Romanian assistant- **Add AI Processing Node**: Adds a purple processing node- **Add Output Node**: Adds a yellow output nodeAll nodes are added at a random position on the canvas.
+
+### Canvas Context Menus ✨
+
+The plugin adds intelligent context menus directly to your canvas:
+
+#### **Right-Click on Canvas Nodes**
+- **Convert to AI Agent**: Turn any text node into a green AI agent
+- **Add AI Processing Node**: Create a connected purple processor node
+
+#### **Right-Click on Canvas Edges**
+- **Insert AI Processing Node**: Add a processor between two connected nodes
+
+#### **Right-Click on Canvas Background**
+- **Add AI Agent**: Create a new green agent node
+- **Add AI Processing Node**: Create a new purple processor
+- **Add Output Node**: Create a new yellow output node
+
+### Additional Ways to Add Nodes
+
+1. **Command Palette** (Active canvas):
+   - Press `Ctrl/Cmd + P`
+   - Type "Add Default Assistant" or "Add AI Processing Node"
+
+2. **Right-Click Canvas File** (File explorer):
+   - Right-click a `.canvas` file in the sidebar
+   - Select node type to add
+
+3. **Ribbon Icon**:
+   - Click the workflow icon to create/open AI Canvas
+
+**Technical Note**: This plugin uses advanced monkey-patching techniques to extend Obsidian's internal Canvas API. While powerful, these techniques rely on undocumented internal APIs that may change with Obsidian updates.
 
 ### Advanced Patterns
 
